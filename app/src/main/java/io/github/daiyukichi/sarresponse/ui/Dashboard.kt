@@ -116,6 +116,7 @@ fun DashboardScreen(
     onDraftConfirm: () -> Unit,
 ) {
     var showPanel by rememberSaveable { mutableStateOf(false) }
+    var videoFullscreen by rememberSaveable { mutableStateOf(false) }
     var mapIsMain by rememberSaveable { mutableStateOf(true) }
     var selectedAlertId by rememberSaveable { mutableStateOf<Long?>(null) }
     var navTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -137,12 +138,16 @@ fun DashboardScreen(
             mapIsMain = true
         }
     }
+    // Pantalla completa solo tiene sentido con el video como vista principal.
+    val fullscreen = videoFullscreen && !mapIsMain && !showPanel && draft == null
     val area = search?.area
     val drone = mission.dronePosition
     val droneOutside = area != null && drone != null && !area.contains(drone)
 
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
-        StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick)
+        if (!fullscreen) {
+            StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick)
+        }
 
         // El panel se dibuja ENCIMA de la vista de operación: así el mapa nunca se destruye
         // y al volver conserva zoom y posición.
@@ -166,7 +171,13 @@ fun DashboardScreen(
                         draft = draft,
                         onMapTap = onMapTap,
                     )
-                    VideoPane(video, compact = mapIsMain, modifier = if (mapIsMain) pip else main)
+                    VideoPane(
+                        video,
+                        compact = mapIsMain,
+                        modifier = if (mapIsMain) pip else main,
+                        fullscreen = fullscreen,
+                        onToggleFullscreen = { videoFullscreen = !fullscreen },
+                    )
                     // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
                     Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
 
@@ -221,7 +232,7 @@ fun DashboardScreen(
                     }
                 }
 
-                AlertPanel(
+                if (!fullscreen) AlertPanel(
                     mission = mission,
                     operator = operator,
                     area = area,

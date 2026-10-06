@@ -15,7 +15,6 @@ import androidx.core.content.ContextCompat
 import com.herohan.uvcapp.CameraException
 import com.herohan.uvcapp.CameraHelper
 import com.herohan.uvcapp.ICameraHelper
-import com.serenegiant.usb.Size
 
 sealed interface VideoStatus {
     data object NoDevice : VideoStatus
@@ -30,7 +29,7 @@ sealed interface VideoStatus {
  * Video del receptor 5.8 GHz conectado por USB (OTG). El receptor es una cámara UVC estándar;
  * se lee con UVCAndroid (libusb/libuvc), sin depender de que el teléfono soporte cámaras USB.
  *
- * Flujo: conectar → permiso USB (Android pregunta) → abrir → elegir 1280×720 → mostrar en [surface].
+ * Flujo: conectar → permiso USB (Android pregunta) → abrir → mostrar en [surface].
  */
 class UsbVideo(private val context: Context) {
     var status by mutableStateOf<VideoStatus>(VideoStatus.NoDevice)
@@ -40,6 +39,8 @@ class UsbVideo(private val context: Context) {
     private var helper: CameraHelper? = null
     private var surface: Surface? = null
     private var surfaceAdded = false
+    /** Receptor ya pedido: Android avisa la conexión por varias vías y pedirlo dos veces lo trababa. */
+    private var selected: UsbDevice? = null
 
     fun start() {
         if (helper != null) return
@@ -48,10 +49,19 @@ class UsbVideo(private val context: Context) {
         main.postDelayed({ helper?.deviceList?.firstOrNull()?.let { select(it) } }, 800)
     }
 
+    /** Si quedó esperando (permiso que no apareció, apertura trabada), vuelve a intentarlo una vez. */
+    private val watchdog = Runnable {
+        if (status == VideoStatus.WaitingUsbPermission || status == VideoStatus.Connecting) {
+            Log.w(TAG, "Sin video después de ${WATCHDOG_MS / 1000} s ($status): reintentando")
+            retry()
+        }
+    }
+
     fun stop() {
         main.removeCallbacksAndMessages(null)
         helper?.release()
         helper = null
+        selected = null
         surfaceAdded = false
         status = VideoStatus.NoDevice
     }
@@ -68,19 +78,28 @@ class UsbVideo(private val context: Context) {
         }
     }
 
-    /** Reintentar después de conceder el permiso de cámara. */
+    /** Reintentar: tras conceder el permiso de cámara, o si el video quedó trabado. */
     fun retry() {
-        helper?.deviceList?.firstOrNull()?.let { select(it) }
+        val h = helper ?: return
+        if (status is VideoStatus.Streaming) return
+        selected = null
+        h.closeCamera()
+        h.deviceList?.firstOrNull()?.let { select(it) }
     }
 
     private fun select(device: UsbDevice) {
+        if (selected?.deviceName == device.deviceName) return
+
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             // Sin este permiso Android no deja abrir cámaras USB.
             status = VideoStatus.NeedCameraPermission
             return
         }
+        selected = device
         status = VideoStatus.WaitingUsbPermission
         helper?.selectDevice(device)
+        main.removeCallbacks(watchdog)
+        main.postDelayed(watchdog, WATCHDOG_MS)
     }
 
     private val callback = object : ICameraHelper.StateCallback {
@@ -98,20 +117,16 @@ class UsbVideo(private val context: Context) {
         override fun onCameraOpen(device: UsbDevice) {
             main.post {
                 val h = helper ?: return@post
+                // Se usa la resolución con la que abre el receptor. Cambiarla después de abrir hizo que
+                // el receptor real (chip MacroSilicon) rechazara la negociación y el video quedara negro.
                 h.startPreview()
-                // El receptor entrega 720p; si la librería abrió otra resolución, cambiar a la mejor.
-                val best = pickSize(h.supportedSizeList.orEmpty())
-                val current = h.previewSize
-                if (best != null && (current == null || current.width != best.width || current.height != best.height)) {
-                    h.setPreviewSize(best)
-                }
                 surface?.let {
-                    h.addSurface(it, false)
+                    if (!surfaceAdded) h.addSurface(it, false)
                     surfaceAdded = true
                 }
-                val size = h.previewSize ?: best
+                val size = h.previewSize
                 Log.i(TAG, "Video abierto: ${size?.width}x${size?.height}; disponibles: ${h.supportedSizeList?.map { "${it.width}x${it.height}" }}")
-                status = VideoStatus.Streaming(size?.width ?: 1280, size?.height ?: 720)
+                status = VideoStatus.Streaming(size?.width ?: 1920, size?.height ?: 1080)
             }
         }
 
@@ -124,11 +139,15 @@ class UsbVideo(private val context: Context) {
         }
 
         override fun onDeviceClose(device: UsbDevice) {
-            main.post { status = VideoStatus.NoDevice }
+            main.post {
+                selected = null
+                status = VideoStatus.NoDevice
+            }
         }
 
         override fun onDetach(device: UsbDevice) {
             main.post {
+                selected = null
                 surfaceAdded = false
                 status = VideoStatus.NoDevice
             }
@@ -136,6 +155,7 @@ class UsbVideo(private val context: Context) {
 
         override fun onCancel(device: UsbDevice) {
             main.post {
+                selected = null
                 status = VideoStatus.Failed("Permiso USB denegado. Desconecta y vuelve a conectar el receptor.")
             }
         }
@@ -148,10 +168,6 @@ class UsbVideo(private val context: Context) {
 
     private companion object {
         const val TAG = "SAR-Video"
-
-        /** 1280×720 si está; si no, la mayor que no pase de 1080p. */
-        fun pickSize(sizes: List<Size>): Size? =
-            sizes.firstOrNull { it.width == 1280 && it.height == 720 }
-                ?: sizes.filter { it.width <= 1920 && it.height <= 1080 }.maxByOrNull { it.width * it.height }
+        const val WATCHDOG_MS = 6_000L
     }
 }
