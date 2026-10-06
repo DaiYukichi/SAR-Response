@@ -1,6 +1,7 @@
 # SAR-Response
 
 **App Android de estación de tierra para drones de búsqueda y rescate (SAR) con IA a bordo.**
+En el teléfono aparece instalada como **SAR**.
 
 SAR-Response es la parte "en manos del rescatista" del proyecto *Universal Edge-AI Rescue
 Payload for Low-Cost Search and Rescue Drones* (IEEE Response Quest 2026). El payload es un
