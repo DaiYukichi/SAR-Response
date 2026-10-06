@@ -48,5 +48,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.maplibre)
+    implementation(libs.uvcandroid)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

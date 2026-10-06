@@ -65,7 +65,7 @@ pensada para ese punto medio:
 | Función | Detalle |
 |---|---|
 | **Mapa en vivo** | Recorrido del dron (línea azul), posición actual (punto azul), un pin por cada detección, la posición del operador (celeste) y una leyenda. Las detecciones pendientes "laten" para llamar la atención. |
-| **Video 5.8 GHz** | Video del VTX del payload con los recuadros de detección dibujados a bordo. *Integración UVC en desarrollo.* |
+| **Video 5.8 GHz** | Video del VTX del payload (con los recuadros de detección dibujados a bordo) desde un receptor FPV **UVC** conectado al teléfono por USB/OTG. Se lee directamente por USB, sin depender de que el teléfono soporte cámaras USB. |
 | **Vistas intercambiables** | Video o mapa a pantalla completa, con la otra vista en miniatura (picture-in-picture). Tocar la miniatura las intercambia sin perder el zoom ni la posición del mapa. |
 | **Detecciones** | Tarjetas con número, confianza de la IA (con color), hora UTC, coordenadas y **distancia y rumbo desde el operador** ("293 m · N 7°"). Botones **Confirmar** / **Descartar**. Las pendientes van primero. |
 | **Navegar a una detección** | Banner con la distancia, el rumbo y una flecha que apunta hacia la persona **según hacia dónde mira el teléfono** (brújula), más una línea punteada en el mapa del operador al objetivo. |
@@ -99,7 +99,8 @@ pensada para ese punto medio:
    - Abre SAR-Response, toca **Elegir fuente** (arriba a la derecha) y elige
      **SAR-Estacion**. Concede los permisos de Bluetooth y ubicación.
    - Espera a ver *Enlace LoRa* en verde y *GPS payload: fix* antes de despegar.
-   - Si usas video, conecta el receptor 5.8 GHz al teléfono por OTG.
+   - Conecta el receptor de video 5.8 GHz al teléfono por USB (OTG), pon el receptor en el
+     canal del VTX (por ejemplo A3 = 5825 MHz) y **acepta el permiso USB** que muestra Android.
 4. **Durante el vuelo**
    - Cuando suene una alerta, toca la detección en la lista: el mapa se centra en ella.
    - Mira el video y decide: **Confirmar** (pin rojo) o **Descartar** (pin gris).
@@ -149,7 +150,8 @@ entre el teléfono y la estación, o entre la estación y el dron.
   - Si el teléfono tiene brújula, la flecha apunta hacia la persona **según hacia dónde mira el
     teléfono**: basta con girar hasta que apunte hacia adelante y caminar.
   - Sin brújula, el rumbo se da respecto al norte, y el banner lo indica.
-- **Video**: imagen del VTX del payload (pendiente de integrar, ver [trabajo futuro](#trabajo-futuro)).
+- **Video**: imagen del VTX del payload. Si no hay receptor conectado, la vista lo indica
+  ("Conecta el receptor…", "Acepta el permiso USB…") y el resto de la app sigue funcionando.
 - **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video.
 
 ### Pestañas Operación / Panel
@@ -276,7 +278,8 @@ SAR-Response/
 │           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
 │           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
-│           └── VideoPane.kt   Vista de video (marcador hasta integrar UVC)
+│           └── VideoPane.kt   Vista del video del receptor
+│       └── video/UsbVideo.kt  Receptor FPV UVC por USB: permiso, apertura, 720p
 ├── app/src/main/assets/mapa/  Estilo, letras e íconos del mapa (y region.pmtiles, generado)
 ├── tools/mapa/                Scripts para generar el mapa offline y su estilo
 ├── firmware/esp32-bt-bridge/  Sketch Arduino del puente LoRa → Bluetooth
@@ -299,6 +302,7 @@ interface LinkSource {
 ```
 
 **Tecnologías:** Kotlin 2.4 · Jetpack Compose (Material 3) · Coroutines/StateFlow ·
+[UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (video USB) ·
 [MapLibre Native](https://maplibre.org) + [PMTiles](https://protomaps.com) · Android Gradle Plugin 9 · minSdk 26 (Android 8.0).
 
 ## Compilar e instalar
@@ -393,6 +397,7 @@ cambiar en `ReplaySource.kt`.
 |---|---|
 | Bluetooth (conectar) | Hablar con la estación tierra. |
 | Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
+| Cámara | **Solo** para leer el receptor de video USB: Android exige este permiso para abrir cualquier cámara USB. La app no usa las cámaras del teléfono. |
 | Vibración | Avisar de nuevas detecciones. |
 
 - **Sin internet, por diseño.** El manifiesto elimina los permisos de red (incluidos los que
@@ -425,7 +430,8 @@ cambiar en `ReplaySource.kt`.
 
 ## Limitaciones conocidas
 
-- **El video UVC aún no está integrado**: la vista de video es un marcador.
+- **El video UVC no se ha probado todavía con el receptor real** (el emulador no tiene USB).
+  Receptor usado: "RXC FPV receiver" 5.8 GHz, salida UVC 720p.
 - El % de área cubierta es una estimación: depende del ancho de barrido que ingresa el operador.
 - La posición de una detección es la del GPS del **dron** en ese momento, no la proyección
   exacta del píxel al suelo. A 40–60 m de altura el error puede ser de varios metros.
@@ -450,7 +456,9 @@ dirección del proyecto.
 
 ### A corto plazo (solo software)
 
-- [ ] **Video 5.8 GHz** dentro de la app con el receptor UVC por OTG.
+- [x] ~~Video 5.8 GHz dentro de la app con el receptor UVC por OTG~~ (hecho; probado solo sin
+      receptor en emulador, falta la prueba en el teléfono con el receptor).
+- [ ] Grabar el video de la misión junto con las detecciones.
 - [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
 - [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
 - [ ] **Cobertura con la altura real:** agregar la altura del dron al latido `$SAH` para calcular
@@ -503,6 +511,8 @@ Código bajo licencia [Apache-2.0](LICENSE).
 
 - Datos de mapas © [colaboradores de OpenStreetMap](https://www.openstreetmap.org/copyright),
   licencia ODbL, procesados por [Protomaps](https://protomaps.com).
+- Video USB: [UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (Apache-2.0), que incluye
+  libuvc (BSD), libusb (LGPL-2.1, enlazada dinámicamente) y libjpeg-turbo (BSD/IJG).
 - Letras Noto Sans: [SIL Open Font License](app/src/main/assets/mapa/licencias/fuentes-OFL.txt).
 - Íconos del mapa: derivados de [tangrams/icons](https://github.com/tangrams/icons), licencia
   [MIT](app/src/main/assets/mapa/licencias/iconos-MIT.md).

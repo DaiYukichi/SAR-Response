@@ -83,8 +83,28 @@ fun MapPane(
     onMapTap: (GeoPoint) -> Unit = {},
 ) {
     val context = LocalContext.current
-    val holder = remember { MapHolder(context) }
     var hasBaseMap by remember { mutableStateOf(true) }
+    var style by remember { mutableStateOf<String?>(null) }
+
+    // Copiar el mapa a disco (19 MB la primera vez) y leer el estilo es E/S: fuera del hilo principal.
+    LaunchedEffect(mapRevision) {
+        style = withContext(Dispatchers.IO) {
+            val file = OfflineMap.file(context)
+            hasBaseMap = file != null
+            OfflineMap.styleJson(context, file)
+        }
+    }
+
+    // El MapView se crea recién cuando el estilo está listo: si se crea antes y el estilo llega
+    // mientras se copia el mapa, MapLibre puede quedar sin dibujar (pasaba en el primer arranque).
+    val json = style
+    if (json == null) {
+        Box(modifier.background(Color(0xFF0B1118)), contentAlignment = Alignment.Center) {
+            Text("Preparando mapa offline…", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        }
+        return
+    }
+    val holder = remember { MapHolder(context) }
     holder.onAlertClick = onAlertClick
     holder.onMapTap = if (draft != null) onMapTap else null
 
@@ -94,7 +114,10 @@ fun MapPane(
             when (event) {
                 Lifecycle.Event.ON_CREATE -> holder.map.onCreate(null)
                 Lifecycle.Event.ON_START -> holder.map.onStart()
-                Lifecycle.Event.ON_RESUME -> holder.map.onResume()
+                Lifecycle.Event.ON_RESUME -> {
+                    holder.map.onResume()
+                    holder.repaint()
+                }
                 Lifecycle.Event.ON_PAUSE -> holder.map.onPause()
                 Lifecycle.Event.ON_STOP -> holder.map.onStop()
                 else -> Unit
@@ -106,16 +129,7 @@ fun MapPane(
             holder.map.onDestroy()
         }
     }
-
-    // Copiar el mapa a disco y leer el estilo es E/S: fuera del hilo principal.
-    LaunchedEffect(mapRevision) {
-        val style = withContext(Dispatchers.IO) {
-            val file = OfflineMap.file(context)
-            hasBaseMap = file != null
-            OfflineMap.styleJson(context, file)
-        }
-        holder.loadStyle(style)
-    }
+    LaunchedEffect(json) { holder.loadStyle(json) }
 
     LaunchedEffect(selectedAlertId) {
         val pos = state.alerts.firstOrNull { it.id == selectedAlertId }?.packet?.position ?: return@LaunchedEffect
@@ -221,6 +235,7 @@ private class MapHolder(context: Context) {
                 addDataLayers(s)
                 style = s
                 lastFrame?.let { draw(it) }
+                m.triggerRepaint()
             }
         }
     }
@@ -238,6 +253,10 @@ private class MapHolder(context: Context) {
         lastFrame = frame
         draw(frame)
         autoCenter(state, operator, area)
+    }
+
+    fun repaint() {
+        mapLibre?.triggerRepaint()
     }
 
     fun animateTo(p: GeoPoint, zoom: Double) {

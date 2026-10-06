@@ -66,6 +66,7 @@ import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.core.SearchArea
+import io.github.daiyukichi.sarresponse.video.UsbVideo
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -102,6 +103,7 @@ fun DashboardScreen(
     heading: Float?,
     toast: String?,
     mapRevision: Int,
+    video: UsbVideo,
     search: Search?,
     onSearchClick: () -> Unit,
     onSourceClick: () -> Unit,
@@ -164,7 +166,7 @@ fun DashboardScreen(
                         draft = draft,
                         onMapTap = onMapTap,
                     )
-                    VideoPane(compact = mapIsMain, modifier = if (mapIsMain) pip else main)
+                    VideoPane(video, compact = mapIsMain, modifier = if (mapIsMain) pip else main)
                     // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
                     Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
 

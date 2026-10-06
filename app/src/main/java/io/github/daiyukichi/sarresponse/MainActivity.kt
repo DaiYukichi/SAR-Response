@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +51,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
@@ -67,6 +71,7 @@ import io.github.daiyukichi.sarresponse.ui.formatDistance
 import io.github.daiyukichi.sarresponse.ui.formatUtc
 import io.github.daiyukichi.sarresponse.ui.rememberDeviceHeading
 import io.github.daiyukichi.sarresponse.ui.rememberOperatorLocation
+import io.github.daiyukichi.sarresponse.video.UsbVideo
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -78,6 +83,7 @@ import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val vm: MissionViewModel by viewModels()
+    private val video by lazy { UsbVideo(applicationContext) }
     private var tone: ToneGenerator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -115,6 +121,21 @@ class MainActivity : ComponentActivity() {
                 ) {
                     permissionsAsked++
                     startupReady = true
+                    video.retry()
+                }
+
+                // Video del receptor USB: activo solo mientras la app está a la vista.
+                val lifecycleOwner = LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner, startupReady) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_START -> if (startupReady) video.start()
+                            Lifecycle.Event.ON_STOP -> video.stop()
+                            else -> Unit
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
                 // Al abrir, pedir de una vez ubicación y Bluetooth: el mapa arranca donde está el operador.
@@ -183,6 +204,7 @@ class MainActivity : ComponentActivity() {
                         heading = heading,
                         toast = toast,
                         mapRevision = mapRevision,
+                        video = video,
                         onSourceClick = {
                             val missing = missingPermissions()
                             if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
@@ -313,6 +335,8 @@ class MainActivity : ComponentActivity() {
     private fun missingPermissions(): List<String> = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        // Android exige el permiso de cámara para leer el receptor de video USB (UVC).
+        add(Manifest.permission.CAMERA)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
     }.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
 
@@ -406,8 +430,9 @@ private fun StartupScreen() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("SAR-Response", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Text(
-                "Permite la ubicación (tu posición en el mapa y la distancia a cada detección) " +
-                    "y el Bluetooth (la estación tierra). La app funciona sin internet.",
+                "Permite la ubicación (tu posición en el mapa y la distancia a cada detección), " +
+                    "el Bluetooth (la estación tierra) y la cámara (Android la exige para leer el " +
+                    "receptor de video USB). La app funciona sin internet.",
                 color = Color(0xFF9FB0C4), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp),
             )
         }
