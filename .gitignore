@@ -1,0 +1,25 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/captures
+.externalNativeBuild
+.cxx
+*.iml
+.idea/
+.kotlin/
+local.properties
+
+# Secretos: nunca al repo
+.env
+*.env
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+google-services.json
+
+# Teselas offline (pesadas; ver README)
+*.mbtiles
+*.sqlite
+
+.DS_Store
