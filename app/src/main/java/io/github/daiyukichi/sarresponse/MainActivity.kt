@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.CsvExporter
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
@@ -104,7 +105,8 @@ class MainActivity : ComponentActivity() {
                 var showNewSearch by remember { mutableStateOf(false) }
                 // Búsqueda en preparación: nombre y barrido ya elegidos, vértices que se van tocando.
                 var draftName by remember { mutableStateOf("") }
-                var draftSwath by remember { mutableStateOf(Search.DEFAULT_SWATH_METERS) }
+                var draftAltitude by remember { mutableStateOf(Search.DEFAULT_ALTITUDE_METERS) }
+                var draftFov by remember { mutableStateOf(CameraGeometry.DEFAULT_HFOV_DEGREES) }
                 var draft by remember { mutableStateOf<List<GeoPoint>?>(null) }
                 var showSources by remember { mutableStateOf(false) }
                 var permissionsAsked by remember { mutableStateOf(0) }
@@ -219,7 +221,7 @@ class MainActivity : ComponentActivity() {
                         onDraftUndo = { draft = draft?.dropLast(1) },
                         onDraftCancel = { draft = null },
                         onDraftConfirm = {
-                            draft?.takeIf { it.size >= 3 }?.let { vm.createSearch(draftName, SearchArea(it), draftSwath) }
+                            draft?.takeIf { it.size >= 3 }?.let { vm.createSearch(draftName, SearchArea(it), draftAltitude, draftFov) }
                             draft = null
                         },
                     )
@@ -247,14 +249,15 @@ class MainActivity : ComponentActivity() {
                 if (showNewSearch) {
                     NewSearchDialog(
                         suggestedName = "Búsqueda ${searches.size + 1}",
-                        onDrawArea = { name, swath ->
+                        onDrawArea = { name, altitude, fov ->
                             draftName = name
-                            draftSwath = swath
+                            draftAltitude = altitude
+                            draftFov = fov
                             draft = emptyList()
                             showNewSearch = false
                         },
-                        onCreateWithoutArea = { name, swath ->
-                            vm.createSearch(name, null, swath)
+                        onCreateWithoutArea = { name, altitude, fov ->
+                            vm.createSearch(name, null, altitude, fov)
                             showNewSearch = false
                         },
                         onDismiss = { showNewSearch = false },

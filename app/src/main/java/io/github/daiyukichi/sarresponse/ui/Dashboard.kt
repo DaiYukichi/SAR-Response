@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -117,6 +118,7 @@ fun DashboardScreen(
 ) {
     var showPanel by rememberSaveable { mutableStateOf(false) }
     var videoFullscreen by rememberSaveable { mutableStateOf(false) }
+    var pipHidden by rememberSaveable { mutableStateOf(false) }
     var mapIsMain by rememberSaveable { mutableStateOf(true) }
     var selectedAlertId by rememberSaveable { mutableStateOf<Long?>(null) }
     var navTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -155,7 +157,12 @@ fun DashboardScreen(
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
                     val main = Modifier.fillMaxSize()
-                    val pip = pipModifier()
+                    // Miniatura oculta: la vista sigue montada (1 dp, invisible) para no perder el mapa ni el video.
+                    val pip = if (pipHidden) {
+                        Modifier.align(Alignment.TopEnd).size(1.dp).graphicsLayer { alpha = 0f }
+                    } else {
+                        pipModifier()
+                    }
                     // Ambos paneles viven siempre en el mismo lugar del árbol: al intercambiarlos solo cambia
                     // su tamaño, así el mapa no se recrea ni pierde zoom/posición.
                     MapPane(
@@ -178,8 +185,35 @@ fun DashboardScreen(
                         fullscreen = fullscreen,
                         onToggleFullscreen = { videoFullscreen = !fullscreen },
                     )
-                    // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
-                    Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
+                    if (!pipHidden) {
+                        // Capa transparente sobre el PiP: tocarlo intercambia las vistas. El botón "–" va
+                        // dentro de la capa para que su toque se atienda antes que el de la capa.
+                        Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain }) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(6.dp)
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.6f))
+                                    .clickable { pipHidden = true },
+                                contentAlignment = Alignment.Center,
+                            ) { Text("–", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp) }
+                        }
+                    } else {
+                        Text(
+                            if (mapIsMain) "▣ Mostrar video" else "▣ Mostrar mapa",
+                            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(10.dp)
+                                .zIndex(4f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .clickable { pipHidden = false }
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                        )
+                    }
 
                     if (draft != null) {
                         DraftBanner(

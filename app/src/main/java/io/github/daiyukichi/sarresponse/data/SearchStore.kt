@@ -3,6 +3,7 @@ package io.github.daiyukichi.sarresponse.data
 import android.content.Context
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.Packet
@@ -82,6 +83,8 @@ class SearchStore(context: Context) {
         .put("name", s.name)
         .put("createdAt", s.createdAtMillis)
         .put("swath", s.swathMeters)
+        .put("altitude", s.altitudeMeters ?: JSONObject.NULL)
+        .put("hfov", s.hfovDegrees)
         .put("finishedAt", s.finishedAtMillis ?: JSONObject.NULL)
         .put("area", s.area?.let { a -> JSONArray().apply { a.vertices.forEach { put(point(it)) } } } ?: JSONObject.NULL)
 
@@ -90,6 +93,8 @@ class SearchStore(context: Context) {
         name = j.getString("name"),
         createdAtMillis = j.getLong("createdAt"),
         swathMeters = j.optDouble("swath", Search.DEFAULT_SWATH_METERS),
+        altitudeMeters = if (j.isNull("altitude") || !j.has("altitude")) null else j.getDouble("altitude"),
+        hfovDegrees = j.optDouble("hfov", CameraGeometry.DEFAULT_HFOV_DEGREES),
         finishedAtMillis = if (j.isNull("finishedAt")) null else j.getLong("finishedAt"),
         area = if (j.isNull("area")) null else j.getJSONArray("area").let { a ->
             SearchArea((0 until a.length()).map { point(a.getJSONArray(it)) })

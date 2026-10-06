@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.LogEvent
@@ -102,7 +103,8 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
         item {
             Text(
                 "Aún no disponible: batería del payload (requiere agregarla al latido \$SAH). " +
-                    "La cobertura es una estimación con el ancho de barrido indicado al crear la búsqueda.",
+                    "La cobertura es una estimación con la altura planificada y el FOV de la cámara " +
+                    "(provisional hasta medirlo).",
                 color = PFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             )
         }
@@ -122,6 +124,15 @@ private fun SearchCard(search: Search?, mission: MissionState) {
             )
             return@Card
         }
+        search.altitudeMeters?.let { h ->
+            val px = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_LYING_M, h, search.hfovDegrees)
+            Text(
+                "A ${h.roundToInt()} m una persona acostada ocupa ≈ ${px.roundToInt()} px en la imagen del modelo" +
+                    if (px < CameraGeometry.MIN_PERSON_PX) " (pocos: la detección puede fallar)" else "",
+                color = if (px < CameraGeometry.MIN_PERSON_PX) PWarn else PMuted, fontSize = 11.sp,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+        }
         // El cálculo recorre una grilla del área: se recuerda mientras el recorrido no cambie.
         val coverage = remember(mission.track.size, area, search.swathMeters) {
             area.coverage(mission.track.map { it.position }, search.swathMeters)
@@ -140,7 +151,11 @@ private fun SearchCard(search: Search?, mission: MissionState) {
         Spacer(Modifier.height(10.dp))
         Row {
             SubKpi("Área", formatArea(area.areaSquareMeters), Modifier.weight(1f))
-            SubKpi("Barrido", "${search.swathMeters.roundToInt()} m", Modifier.weight(1f))
+            SubKpi(
+                "Barrido",
+                "${search.swathMeters.roundToInt()} m" + (search.altitudeMeters?.let { " · ${it.roundToInt()} m alt." } ?: ""),
+                Modifier.weight(1.4f),
+            )
             val outside = mission.alerts.count { a -> a.packet.position?.let { !area.contains(it) } == true }
             SubKpi("Fuera del área", "$outside", Modifier.weight(1f))
         }

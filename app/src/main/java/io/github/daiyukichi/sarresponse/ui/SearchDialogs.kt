@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -28,11 +30,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.data.SearchSummary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private val DateFmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.ROOT)
 
@@ -113,37 +117,81 @@ fun SearchesDialog(
     }
 }
 
-/** Datos de una búsqueda nueva antes de (opcionalmente) dibujar su área. */
+/**
+ * Datos de una búsqueda nueva antes de (opcionalmente) dibujar su área.
+ * Con la altura de vuelo y el FOV de la cámara se calcula el ancho de barrido y cuántos píxeles
+ * ocupa una persona en la imagen que ve el modelo, con un aviso si es demasiado poco.
+ */
 @Composable
 fun NewSearchDialog(
     suggestedName: String,
-    onDrawArea: (name: String, swathMeters: Double) -> Unit,
-    onCreateWithoutArea: (name: String, swathMeters: Double) -> Unit,
+    onDrawArea: (name: String, altitudeMeters: Double, hfovDegrees: Double) -> Unit,
+    onCreateWithoutArea: (name: String, altitudeMeters: Double, hfovDegrees: Double) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(suggestedName) }
-    var swath by remember { mutableStateOf(Search.DEFAULT_SWATH_METERS.toInt().toString()) }
-    val swathValue = swath.toDoubleOrNull()?.takeIf { it in 5.0..500.0 }
+    var altitude by remember { mutableStateOf(Search.DEFAULT_ALTITUDE_METERS.toInt().toString()) }
+    var fov by remember { mutableStateOf(CameraGeometry.DEFAULT_HFOV_DEGREES.toInt().toString()) }
+    val h = altitude.toDoubleOrNull()?.takeIf { it in 2.0..300.0 }
+    val f = fov.toDoubleOrNull()?.takeIf { it in 10.0..170.0 }
+    val valid = h != null && f != null
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nueva búsqueda") },
         text = {
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nombre") }, singleLine = true)
                 Spacer(Modifier.padding(4.dp))
-                OutlinedTextField(
-                    value = swath,
-                    onValueChange = { swath = it.filter(Char::isDigit).take(3) },
-                    label = { Text("Ancho de barrido (m)") },
-                    singleLine = true,
-                    isError = swathValue == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
+                Row {
+                    OutlinedTextField(
+                        value = altitude,
+                        onValueChange = { altitude = it.filter(Char::isDigit).take(3) },
+                        label = { Text("Altura (m)") },
+                        singleLine = true,
+                        isError = h == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedTextField(
+                        value = fov,
+                        onValueChange = { fov = it.filter(Char::isDigit).take(3) },
+                        label = { Text("FOV cámara (°)") },
+                        singleLine = true,
+                        isError = f == null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (h != null && f != null) {
+                    val swath = CameraGeometry.swathMeters(h, f)
+                    val lying = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_LYING_M, h, f)
+                    val above = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_FROM_ABOVE_M, h, f)
+                    val min = CameraGeometry.MIN_PERSON_PX
+                    Text(
+                        "Barrido: ${swath.roundToInt()} m de ancho por pasada",
+                        fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Text(
+                        "Persona acostada ≈ ${lying.roundToInt()} px ${if (lying >= min) "✓" else "⚠"} · " +
+                            "de pie vista desde arriba ≈ ${above.roundToInt()} px ${if (above >= min) "✓" else "⚠"}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    if (lying < min) {
+                        val maxH = CameraGeometry.maxAltitudeFor(CameraGeometry.PERSON_LYING_M, f)
+                        Text(
+                            "Demasiado alto: una persona ocuparía muy pocos píxeles para que el modelo la detecte bien. " +
+                                "Baja a ${maxH.toInt()} m o menos.",
+                            color = Color(0xFFF87171), style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
                 Text(
-                    "Ancho de terreno que ve la cámara en cada pasada; depende de la altura de vuelo. " +
-                        "Se usa para estimar el % del área cubierta.",
+                    "El FOV es provisional hasta medir la cámara del payload: ponla a 2 m de una pared, " +
+                        "mide el ancho W (en m) que se ve completo y usa FOV = 2·atan(W/4).",
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 6.dp),
+                    modifier = Modifier.padding(top = 8.dp),
                 )
                 Text(
                     "Después podrás dibujar el área tocando sus esquinas en el mapa (funciona sin internet).",
@@ -153,14 +201,14 @@ fun NewSearchDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = swathValue != null, onClick = { onDrawArea(name, swathValue!!) }) {
+            TextButton(enabled = valid, onClick = { onDrawArea(name, h!!, f!!) }) {
                 Text("Dibujar área", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             Row {
                 TextButton(onClick = onDismiss) { Text("Cancelar") }
-                TextButton(enabled = swathValue != null, onClick = { onCreateWithoutArea(name, swathValue!!) }) {
+                TextButton(enabled = valid, onClick = { onCreateWithoutArea(name, h!!, f!!) }) {
                     Text("Sin área")
                 }
             }

@@ -110,18 +110,33 @@ data class SearchArea(val vertices: List<GeoPoint>) {
     }
 }
 
-/** Una búsqueda: su nombre, cuándo se creó, su área (opcional) y el ancho que ve la cámara. */
+/**
+ * Una búsqueda: su nombre, cuándo se creó, su área (opcional) y la altura de vuelo planificada,
+ * con la que se calcula el ancho que ve la cámara ([swathMeters]).
+ */
 data class Search(
     val id: String,
     val name: String,
     val createdAtMillis: Long,
     val area: SearchArea? = null,
-    /** Ancho de terreno que cubre la cámara en cada pasada, en metros (estimado por el operador). */
+    /** Ancho de terreno que cubre la cámara en cada pasada, en metros. */
     val swathMeters: Double = DEFAULT_SWATH_METERS,
     val finishedAtMillis: Long? = null,
+    /** Altura de vuelo planificada sobre el terreno (null en búsquedas viejas, que solo tenían barrido). */
+    val altitudeMeters: Double? = null,
+    /** FOV horizontal de la cámara usado para el cálculo. */
+    val hfovDegrees: Double = CameraGeometry.DEFAULT_HFOV_DEGREES,
 ) {
     companion object {
         const val DEFAULT_SWATH_METERS = 40.0
+        const val DEFAULT_ALTITUDE_METERS = 30.0
+
+        fun planned(id: String, name: String, createdAtMillis: Long, area: SearchArea?, altitudeMeters: Double, hfovDegrees: Double) =
+            Search(
+                id = id, name = name, createdAtMillis = createdAtMillis, area = area,
+                swathMeters = CameraGeometry.swathMeters(altitudeMeters, hfovDegrees),
+                altitudeMeters = altitudeMeters, hfovDegrees = hfovDegrees,
+            )
     }
 }
 

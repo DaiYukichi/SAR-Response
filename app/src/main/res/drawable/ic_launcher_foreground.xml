@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pin de mapa (dónde) con una detección (punto ámbar) y ondas de radio (enlace LoRa). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- ondas de señal -->
+    <path
+        android:pathData="M67,31a14,14 0,0 1,7 11"
+        android:strokeWidth="3.5"
+        android:strokeColor="#2DD4BF"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M70,23a23,23 0,0 1,12 19"
+        android:strokeWidth="3.5"
+        android:strokeColor="#2DD4BF"
+        android:strokeLineCap="round" />
+    <!-- pin con hueco -->
+    <path
+        android:fillColor="#4F9BFF"
+        android:fillType="evenOdd"
+        android:pathData="M51,27c-11.6,0 -21,9.4 -21,21c0,15.5 21,35 21,35s21,-19.5 21,-35c0,-11.6 -9.4,-21 -21,-21zM51,38.5a9.5,9.5 0,1 0,0 19a9.5,9.5 0,1 0,0 -19z" />
+    <!-- detección -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M51,42a6,6 0,1 0,0 12a6,6 0,1 0,0 -12z" />
+</vector>

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.GpxExporter
 import io.github.daiyukichi.sarresponse.core.LinkSource
@@ -86,8 +87,8 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun createSearch(name: String, area: SearchArea?, swathMeters: Double) {
-        viewModelScope.launch { activate(newSearch(name, area, swathMeters)) }
+    fun createSearch(name: String, area: SearchArea?, altitudeMeters: Double, hfovDegrees: Double) {
+        viewModelScope.launch { activate(newSearch(name, area, altitudeMeters, hfovDegrees)) }
     }
 
     fun openSearch(id: String) {
@@ -132,7 +133,8 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         _demoOperator.value = demo.operatorPosition
         viewModelScope.launch {
             // La demo crea su propia búsqueda, con un área alrededor del barrido simulado.
-            activate(newSearch("Demo ${timeLabel()}", SearchArea.rectangle(demo.center, 280.0, 330.0), 50.0))
+            // 36 m de altura con el FOV provisional ≈ 50 m de barrido, igual a la separación de pasadas.
+            activate(newSearch("Demo ${timeLabel()}", SearchArea.rectangle(demo.center, 280.0, 330.0), 36.0, CameraGeometry.DEFAULT_HFOV_DEGREES))
             connect(demo, reconnect = false)
         }
     }
@@ -142,14 +144,16 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         _demoOperator.value = null
         viewModelScope.launch {
             // Si llegan datos sin una búsqueda abierta, se crea una para no perder nada.
-            if (_activeSearch.value == null) activate(newSearch("Búsqueda ${timeLabel()}", null, Search.DEFAULT_SWATH_METERS))
+            if (_activeSearch.value == null) {
+                activate(newSearch("Búsqueda ${timeLabel()}", null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES))
+            }
             connect(makeSource { _link.update { it.copy(status = LinkStatus.CONNECTED, error = null) } }, reconnect = true)
         }
     }
 
-    private fun newSearch(name: String, area: SearchArea?, swathMeters: Double): Search {
+    private fun newSearch(name: String, area: SearchArea?, altitudeMeters: Double, hfovDegrees: Double): Search {
         val now = System.currentTimeMillis()
-        return Search(id = "b$now", name = name.ifBlank { "Búsqueda ${timeLabel()}" }, createdAtMillis = now, area = area, swathMeters = swathMeters)
+        return Search.planned("b$now", name.ifBlank { "Búsqueda ${timeLabel()}" }, now, area, altitudeMeters, hfovDegrees)
     }
 
     private suspend fun activate(search: Search) {

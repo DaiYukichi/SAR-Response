@@ -66,7 +66,7 @@ pensada para ese punto medio:
 |---|---|
 | **Mapa en vivo** | Recorrido del dron (línea azul), posición actual (punto azul), un pin por cada detección, la posición del operador (celeste) y una leyenda. Las detecciones pendientes "laten" para llamar la atención. |
 | **Video 5.8 GHz** | Video del VTX del payload (con los recuadros de detección dibujados a bordo) desde un receptor FPV **UVC** conectado al teléfono por USB/OTG. Se lee directamente por USB, sin depender de que el teléfono soporte cámaras USB. |
-| **Vistas intercambiables** | Video o mapa a pantalla completa, con la otra vista en miniatura (picture-in-picture). Tocar la miniatura las intercambia sin perder el zoom ni la posición del mapa. |
+| **Vistas intercambiables** | Video o mapa a pantalla completa, con la otra vista en miniatura (picture-in-picture). Tocar la miniatura las intercambia sin perder el zoom ni la posición del mapa; el botón **–** la oculta y **▣ Mostrar** la trae de vuelta. El video se puede **rotar** de a 90° y ver en **pantalla completa**. |
 | **Detecciones** | Tarjetas con número, confianza de la IA (con color), hora UTC, coordenadas y **distancia y rumbo desde el operador** ("293 m · N 7°"). Botones **Confirmar** / **Descartar**. Las pendientes van primero. |
 | **Navegar a una detección** | Banner con la distancia, el rumbo y una flecha que apunta hacia la persona **según hacia dónde mira el teléfono** (brújula), más una línea punteada en el mapa del operador al objetivo. |
 | **Compartir coordenadas** | En una detección confirmada, envía por WhatsApp, SMS, correo, etc. un texto que se entiende sin la app: coordenadas, distancia y rumbo desde el operador, enlace a OpenStreetMap y enlace `geo:`. |
@@ -74,7 +74,7 @@ pensada para ese punto medio:
 | **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
-| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y ancho de barrido. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
+| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
 | **Mapa offline** | Mapa vectorial de OpenStreetMap (Chiriquí incluido, ~20 MB) con calles, lugares y nombres en español. Se puede importar el de otra zona. Nada se descarga en campo. |
@@ -91,7 +91,8 @@ pensada para ese punto medio:
    - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
      *Ajustes → Bluetooth*.
 2. **Crear la búsqueda**
-   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre y ancho de barrido.
+   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre, altura de vuelo y FOV de la cámara.
+     La app muestra el barrido y el tamaño de una persona en píxeles (✓ / ⚠).
    - **Dibujar área:** toca las esquinas del área en el mapa (mínimo 3) y **Crear búsqueda**.
      Ves la superficie mientras dibujas. También puedes crearla **sin área**.
 3. **En el punto de despegue**
@@ -152,7 +153,10 @@ entre el teléfono y la estación, o entre la estación y el dron.
   - Sin brújula, el rumbo se da respecto al norte, y el banner lo indica.
 - **Video**: imagen del VTX del payload. Si no hay receptor conectado, la vista lo indica
   ("Conecta el receptor…", "Acepta el permiso USB…") y el resto de la app sigue funcionando.
-- **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video.
+- **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video; **–** la oculta y
+  **▣ Mostrar mapa / video** la vuelve a mostrar.
+- **Video grande:** **⟳** lo gira de a 90° (girado aprovecha el alto del teléfono en vertical) y
+  **⤢ Completa** oculta el encabezado y la lista.
 
 ### Pestañas Operación / Panel
 
@@ -173,7 +177,14 @@ conserva el zoom y la posición.
 La primera tarjeta es la **búsqueda**: superficie del área, ancho de barrido, detecciones fuera del
 área y **% del área cubierta (estimado)**. La cobertura cuenta qué parte del área quedó a menos de
 medio ancho de barrido del recorrido del dron; es una estimación que supone cámara hacia abajo y
-altura constante. La **batería del payload** no se muestra todavía porque el protocolo no la trae
+altura constante.
+
+**Altura, barrido y tamaño de la persona.** Con la cámara hacia abajo, el ancho de terreno visto es
+`2 × altura × tan(FOV/2)`. El modelo recibe la imagen reducida a 640 px de ancho, así que una persona
+de tamaño `s` ocupa `s × 640 / barrido` píxeles. El modelo se entrenó con personas de unos 13×16 px;
+por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV es provisional (70°)** hasta
+medir la cámara del payload: a 2 m de una pared, medir el ancho `W` visible y usar
+`FOV = 2·atan(W/4)`. La **batería del payload** no se muestra todavía porque el protocolo no la trae
 ([trabajo futuro](#trabajo-futuro)).
 
 ### Panel de detecciones (abajo)
@@ -461,8 +472,11 @@ dirección del proyecto.
 - [ ] Grabar el video de la misión junto con las detecciones.
 - [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
 - [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
-- [ ] **Cobertura con la altura real:** agregar la altura del dron al latido `$SAH` para calcular
-      el ancho de barrido solo, en vez de que lo ingrese el operador.
+- [ ] **Medir el FOV real** de la cámara del payload (hoy 70° provisional).
+- [ ] **Altura real en vuelo:** agregar la altura relativa al despegue al latido `$SAH` (GPS o
+      barómetro) para que la cobertura use la altura medida y no la planificada.
+- [ ] **Recall según tamaño en píxeles** a partir de la evaluación del modelo en la K230, para que
+      el umbral de altura salga de datos propios y no de un valor supuesto.
 - [ ] **Batería del payload** en el panel: agregar el voltaje leído por el divisor en ADC0 al
       latido `$SAH`.
 - [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
