@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,7 @@ import io.github.daiyukichi.sarresponse.core.LogEvent
 import io.github.daiyukichi.sarresponse.core.MissionLog
 import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.MissionStats
+import io.github.daiyukichi.sarresponse.core.Search
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -66,7 +68,7 @@ private val PDismissed = Color(0xFF657289)
  * Lo que el protocolo todavía no trae (área cubierta, batería) se indica como no disponible.
  */
 @Composable
-fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, modifier: Modifier = Modifier) {
+fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: Search?, modifier: Modifier = Modifier) {
     val st = MissionStats.from(mission, now)
     val log = MissionLog.events(mission)
     LazyColumn(
@@ -74,6 +76,7 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, modifier:
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        item { SearchCard(search, mission) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Kpi("Tiempo de misión", formatDuration(st.elapsedMillis), "desde el primer paquete", Modifier.weight(1f))
@@ -98,10 +101,48 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, modifier:
         item { LogCard(log) }
         item {
             Text(
-                "Aún no disponible: % del área cubierta (requiere delimitar la búsqueda y la altura del dron) y " +
-                    "batería del payload (requiere agregarla al latido \$SAH). Ver \"Trabajo futuro\" en el README.",
+                "Aún no disponible: batería del payload (requiere agregarla al latido \$SAH). " +
+                    "La cobertura es una estimación con el ancho de barrido indicado al crear la búsqueda.",
                 color = PFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             )
+        }
+    }
+}
+
+/** Área de la búsqueda y cuánto se ha cubierto (estimado con el recorrido y el ancho de barrido). */
+@Composable
+private fun SearchCard(search: Search?, mission: MissionState) {
+    Card(search?.name ?: "Sin búsqueda activa") {
+        val area = search?.area
+        if (search == null || area == null) {
+            Text(
+                if (search == null) "Crea una búsqueda desde la barra de arriba para registrar la misión."
+                else "Esta búsqueda no tiene área. Crea una con área para ver la cobertura.",
+                color = PFaint, fontSize = 12.sp,
+            )
+            return@Card
+        }
+        // El cálculo recorre una grilla del área: se recuerda mientras el recorrido no cambie.
+        val coverage = remember(mission.track.size, area, search.swathMeters) {
+            area.coverage(mission.track.map { it.position }, search.swathMeters)
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text("${(coverage * 100).roundToInt()} %", color = PTeal, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.width(8.dp))
+            Text("del área cubierta (estimado)", color = PMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+        }
+        Box(
+            Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(PSurface2)
+                .border(1.dp, PLine, RoundedCornerShape(6.dp)),
+        ) {
+            if (coverage > 0) Box(Modifier.fillMaxHeight().fillMaxWidth(coverage.toFloat()).clip(RoundedCornerShape(6.dp)).background(PTeal))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row {
+            SubKpi("Área", formatArea(area.areaSquareMeters), Modifier.weight(1f))
+            SubKpi("Barrido", "${search.swathMeters.roundToInt()} m", Modifier.weight(1f))
+            val outside = mission.alerts.count { a -> a.packet.position?.let { !area.contains(it) } == true }
+            SubKpi("Fuera del área", "$outside", Modifier.weight(1f))
         }
     }
 }

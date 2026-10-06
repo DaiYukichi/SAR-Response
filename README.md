@@ -74,10 +74,11 @@ pensada para ese punto medio:
 | **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
+| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y ancho de barrido. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
 | **Mapa offline** | Mapa vectorial de OpenStreetMap (Chiriquí incluido, ~20 MB) con calles, lugares y nombres en español. Se puede importar el de otra zona. Nada se descarga en campo. |
-| **Arranque listo** | Al abrir, pide de una vez los permisos de ubicación y Bluetooth, y el mapa arranca centrado en la posición del operador. |
+| **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
 | **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
 
@@ -89,21 +90,26 @@ pensada para ese punto medio:
      del teléfono puede tardar de 30 s a unos minutos.
    - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
      *Ajustes → Bluetooth*.
-2. **En el punto de despegue**
+2. **Crear la búsqueda**
+   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre y ancho de barrido.
+   - **Dibujar área:** toca las esquinas del área en el mapa (mínimo 3) y **Crear búsqueda**.
+     Ves la superficie mientras dibujas. También puedes crearla **sin área**.
+3. **En el punto de despegue**
    - Enciende la estación tierra y el payload.
    - Abre SAR-Response, toca **Elegir fuente** (arriba a la derecha) y elige
      **SAR-Estacion**. Concede los permisos de Bluetooth y ubicación.
    - Espera a ver *Enlace LoRa* en verde y *GPS payload: fix* antes de despegar.
    - Si usas video, conecta el receptor 5.8 GHz al teléfono por OTG.
-3. **Durante el vuelo**
+4. **Durante el vuelo**
    - Cuando suene una alerta, toca la detección en la lista: el mapa se centra en ella.
    - Mira el video y decide: **Confirmar** (pin rojo) o **Descartar** (pin gris).
-4. **Para llegar a la persona**
+5. **Para llegar a la persona**
    - Toca **➤ Navegar a** en la detección: la flecha del banner apunta hacia ella y la
      distancia se actualiza mientras caminas.
    - O toca **Compartir coordenadas** para mandárselas al equipo que va a pie.
-5. **Al terminar**
-   - Toca **Exportar GPX** para guardar las detecciones y el recorrido.
+6. **Al terminar**
+   - En la barra **BÚSQUEDA**: **Exportar GPX / CSV** y **Terminar esta búsqueda**. Queda guardada
+     en la lista de anteriores.
 
 ## La pantalla, parte por parte
 
@@ -117,7 +123,11 @@ pensada para ese punto medio:
 
 Los umbrales de LoRa salen del latido del payload, que llega cada 30 s.
 
-Debajo: **paquetes recibidos · perdidos · corruptos**. Arriba a la derecha está **Exportar GPX**.
+Debajo: **paquetes recibidos · perdidos · corruptos**.
+
+La barra **BÚSQUEDA** muestra la búsqueda en curso y la superficie de su área; al tocarla se abre la
+lista: exportar GPX/CSV, terminar, crear una nueva, o abrir/borrar una anterior. Si llegan datos sin
+ninguna búsqueda abierta, la app crea una automáticamente para no perder nada.
 - *Perdidos* se calcula con el número de secuencia: si después del 41 llega el 44, se
   perdieron 2.
 - *Corruptos* son líneas con checksum inválido o mal formadas (ruido de radio).
@@ -158,8 +168,11 @@ conserva el zoom y la posición.
 | Equipo | Distancia del operador al dron y a cada detección activa. |
 | Registro de misión | Primer paquete, detecciones recibidas, decisiones (con cuánto tardaron) y silencios de más de 45 s. |
 
-El **% de área cubierta** y la **batería del payload** no se muestran todavía porque el protocolo
-no trae esos datos; están en [trabajo futuro](#trabajo-futuro).
+La primera tarjeta es la **búsqueda**: superficie del área, ancho de barrido, detecciones fuera del
+área y **% del área cubierta (estimado)**. La cobertura cuenta qué parte del área quedó a menos de
+medio ancho de barrido del recorrido del dron; es una estimación que supone cámara hacia abajo y
+altura constante. La **batería del payload** no se muestra todavía porque el protocolo no la trae
+([trabajo futuro](#trabajo-futuro)).
 
 ### Panel de detecciones (abajo)
 
@@ -248,17 +261,20 @@ SAR-Response/
 │       ├── ReplaySource.kt    Misión simulada para demos
 │       ├── GpxExporter.kt     Exportación GPX 1.1
 │       ├── MissionStats.kt    Indicadores del panel, registro de misión y exportación CSV
+│       ├── SearchArea.kt      Búsqueda y su área: superficie, contiene/no contiene, cobertura
 │       └── Geo.kt             Distancia, rumbo, punto cardinal y desplazamientos
 ├── app/                       Aplicación Android (Jetpack Compose)
 │   └── src/main/java/.../sarresponse/
 │       ├── MainActivity.kt    Permisos, elección de fuente, avisos, exportación
-│       ├── MissionViewModel.kt Conexión con reintentos y estado expuesto a la UI
+│       ├── MissionViewModel.kt Conexión con reintentos, búsquedas y guardado automático
+│       ├── data/SearchStore.kt Búsquedas guardadas como JSON en el teléfono
 │       ├── link/BluetoothSppSource.kt  Bluetooth clásico (RFCOMM/SPP)
 │       └── ui/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
 │           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
 │           ├── OfflineMap.kt  Archivo .pmtiles local, importación y estilo offline
 │           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
+│           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista de video (marcador hasta integrar UVC)
 ├── app/src/main/assets/mapa/  Estilo, letras e íconos del mapa (y region.pmtiles, generado)
@@ -358,7 +374,8 @@ El estilo del mapa (tema oscuro, etiquetas en español) se genera con
 
 ## Modo demo
 
-En el selector de fuente, **Demo (misión simulada)** reproduce una misión de unos 80 segundos:
+En el selector de fuente, **Demo (misión simulada)** crea una búsqueda "Demo" con su área y reproduce
+una misión de unos 80 segundos:
 
 - el dron barre el área en pasadas paralelas (patrón de "cortadora de césped"),
 - llegan latidos con posición y 4 detecciones con distintas confianzas,
@@ -409,8 +426,7 @@ cambiar en `ReplaySource.kt`.
 ## Limitaciones conocidas
 
 - **El video UVC aún no está integrado**: la vista de video es un marcador.
-- **La misión vive en memoria**: sobrevive a girar la pantalla, pero si Android cierra la
-  app se pierde. Exporta el GPX si necesitas conservarla.
+- El % de área cubierta es una estimación: depende del ancho de barrido que ingresa el operador.
 - La posición de una detección es la del GPS del **dron** en ese momento, no la proyección
   exacta del píxel al suelo. A 40–60 m de altura el error puede ser de varios metros.
 - La brújula del teléfono indica el norte **magnético**; la diferencia con el norte geográfico
@@ -435,12 +451,10 @@ dirección del proyecto.
 ### A corto plazo (solo software)
 
 - [ ] **Video 5.8 GHz** dentro de la app con el receptor UVC por OTG.
-- [ ] **Registro persistente de la misión** (Room) para que sobreviva si Android cierra la app.
-- [ ] **Búsquedas separadas y delimitadas:** cada misión con su nombre, su recorrido y sus
-      detecciones, y un **área dibujada sobre el mapa offline**; aviso si el dron sale de ella.
-      "Nueva búsqueda" archiva la anterior y permite volver a revisarla.
-- [ ] **% del área cubierta** en el panel: requiere el área de búsqueda y agregar la altura del
-      dron al latido `$SAH` (para saber el ancho que ve la cámara).
+- [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
+- [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
+- [ ] **Cobertura con la altura real:** agregar la altura del dron al latido `$SAH` para calcular
+      el ancho de barrido solo, en vez de que lo ingrese el operador.
 - [ ] **Batería del payload** en el panel: agregar el voltaje leído por el divisor en ADC0 al
       latido `$SAH`.
 - [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").

@@ -93,9 +93,13 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
         }
     }
 
-    fun reset() {
+    fun reset() = restore(MissionState())
+
+    /** Retoma una búsqueda guardada; el próximo paquete no cuenta pérdidas contra el último seq viejo. */
+    fun restore(saved: MissionState) {
         lastSeq = null
-        _state.value = MissionState()
+        nextAlertId = (saved.alerts.maxOfOrNull { it.id } ?: 0L) + 1
+        _state.value = saved
     }
 
     private companion object {

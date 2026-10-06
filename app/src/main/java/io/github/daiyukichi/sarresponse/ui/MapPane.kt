@@ -30,18 +30,21 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
+import io.github.daiyukichi.sarresponse.core.SearchArea
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.FillLayer
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory.circleColor
@@ -49,6 +52,8 @@ import org.maplibre.android.style.layers.PropertyFactory.circleOpacity
 import org.maplibre.android.style.layers.PropertyFactory.circleRadius
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor
 import org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth
+import org.maplibre.android.style.layers.PropertyFactory.fillColor
+import org.maplibre.android.style.layers.PropertyFactory.fillOpacity
 import org.maplibre.android.style.layers.PropertyFactory.lineCap
 import org.maplibre.android.style.layers.PropertyFactory.lineColor
 import org.maplibre.android.style.layers.PropertyFactory.lineDasharray
@@ -72,11 +77,16 @@ fun MapPane(
     mapRevision: Int,
     onAlertClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    area: SearchArea? = null,
+    /** Vértices del área que se está dibujando; si no es null, tocar el mapa agrega un vértice. */
+    draft: List<GeoPoint>? = null,
+    onMapTap: (GeoPoint) -> Unit = {},
 ) {
     val context = LocalContext.current
     val holder = remember { MapHolder(context) }
     var hasBaseMap by remember { mutableStateOf(true) }
     holder.onAlertClick = onAlertClick
+    holder.onMapTap = if (draft != null) onMapTap else null
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -113,7 +123,7 @@ fun MapPane(
     }
 
     Box(modifier.clipToBounds()) {
-        AndroidView(factory = { holder.map }, update = { holder.render(state, selectedAlertId, operator, navTargetId, pulse) })
+        AndroidView(factory = { holder.map }, update = { holder.render(state, selectedAlertId, operator, navTargetId, pulse, area, draft) })
         Text(
             "© OpenStreetMap · Protomaps",
             color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp,
@@ -142,11 +152,14 @@ fun MapPane(
 private class MapHolder(context: Context) {
     val map: MapView
     var onAlertClick: (Long) -> Unit = {}
+    /** Modo "dibujar área": cada toque en el mapa es un vértice. */
+    var onMapTap: ((GeoPoint) -> Unit)? = null
 
     private var mapLibre: MapLibreMap? = null
     private var style: Style? = null
     private var lastFrame: Frame? = null
     private var centered = Centered.NONE
+    private var framedArea: SearchArea? = null
 
     private enum class Centered { NONE, OPERATOR, DRONE }
 
@@ -157,6 +170,8 @@ private class MapHolder(context: Context) {
         val operator: GeoPoint?,
         val navTargetId: Long?,
         val pulse: Boolean,
+        val area: SearchArea?,
+        val draft: List<GeoPoint>?,
     )
 
     init {
@@ -184,6 +199,10 @@ private class MapHolder(context: Context) {
             m.uiSettings.isRotateGesturesEnabled = false
             m.uiSettings.isTiltGesturesEnabled = false
             m.addOnMapClickListener { latLng ->
+                onMapTap?.let {
+                    it(GeoPoint(latLng.latitude, latLng.longitude))
+                    return@addOnMapClickListener true
+                }
                 val p = m.projection.toScreenLocation(latLng)
                 val r = 24f * context.resources.displayMetrics.density
                 val hit = m.queryRenderedFeatures(RectF(p.x - r, p.y - r, p.x + r, p.y + r), LAYER_ALERTS).firstOrNull()
@@ -206,11 +225,19 @@ private class MapHolder(context: Context) {
         }
     }
 
-    fun render(state: MissionState, selectedId: Long?, operator: GeoPoint?, navTargetId: Long?, pulse: Boolean) {
-        val frame = Frame(state, selectedId, operator, navTargetId, pulse)
+    fun render(
+        state: MissionState,
+        selectedId: Long?,
+        operator: GeoPoint?,
+        navTargetId: Long?,
+        pulse: Boolean,
+        area: SearchArea?,
+        draft: List<GeoPoint>?,
+    ) {
+        val frame = Frame(state, selectedId, operator, navTargetId, pulse, area, draft)
         lastFrame = frame
         draw(frame)
-        autoCenter(state, operator)
+        autoCenter(state, operator, area)
     }
 
     fun animateTo(p: GeoPoint, zoom: Double) {
@@ -218,9 +245,17 @@ private class MapHolder(context: Context) {
     }
 
     /** Al abrir, centra en el operador; cuando llega el primer fix del dron, en el dron. */
-    private fun autoCenter(state: MissionState, operator: GeoPoint?) {
+    private fun autoCenter(state: MissionState, operator: GeoPoint?, area: SearchArea?) {
         val m = mapLibre ?: return
         val drone = state.dronePosition
+        // Al abrir o crear una búsqueda con área, encuadrarla completa.
+        if (area != null && area != framedArea && drone == null) {
+            framedArea = area
+            centered = Centered.OPERATOR
+            val bounds = LatLngBounds.Builder().includes(area.vertices.map { LatLng(it.lat, it.lon) }).build()
+            m.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80), 600)
+            return
+        }
         if (drone != null && centered != Centered.DRONE) {
             centered = Centered.DRONE
             m.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(drone.lat, drone.lon), 16.0), 800)
@@ -246,12 +281,30 @@ private class MapHolder(context: Context) {
         }
         s.source(SRC_ALERTS)?.setGeoJson(points(features))
 
+        s.source(SRC_AREA)?.setGeoJson(f.area?.let { polygon(it.vertices) } ?: EMPTY)
+        val d = f.draft.orEmpty()
+        s.source(SRC_DRAFT)?.setGeoJson(if (d.size >= 3) polygon(d) else lineString(d))
+        s.source(SRC_DRAFT_PTS)?.setGeoJson(points(d.map { it to "" }))
+
         // Las pendientes "laten": el halo crece y se achica cada segundo.
         s.getLayer(LAYER_HALO)?.setProperties(circleRadius(if (f.pulse) 20f else 13f))
     }
 
     private fun addDataLayers(s: Style) {
-        listOf(SRC_TRACK, SRC_NAV, SRC_ALERTS, SRC_OPERATOR, SRC_DRONE).forEach { s.addSource(GeoJsonSource(it, EMPTY)) }
+        listOf(SRC_AREA, SRC_DRAFT, SRC_DRAFT_PTS, SRC_TRACK, SRC_NAV, SRC_ALERTS, SRC_OPERATOR, SRC_DRONE)
+            .forEach { s.addSource(GeoJsonSource(it, EMPTY)) }
+
+        // Área de la búsqueda: relleno suave y borde.
+        s.addLayer(FillLayer("sar-area-fill", SRC_AREA).withProperties(fillColor(AREA), fillOpacity(0.10f)))
+        s.addLayer(LineLayer("sar-area-line", SRC_AREA).withProperties(lineColor(AREA), lineWidth(2.5f)))
+        // Área en dibujo: más visible, con los vértices marcados.
+        s.addLayer(FillLayer("sar-draft-fill", SRC_DRAFT).withProperties(fillColor(AREA), fillOpacity(0.18f)))
+        s.addLayer(LineLayer("sar-draft-line", SRC_DRAFT).withProperties(lineColor(AREA), lineWidth(3f), lineDasharray(arrayOf(2f, 1f))))
+        s.addLayer(
+            CircleLayer("sar-draft-pts", SRC_DRAFT_PTS).withProperties(
+                circleRadius(6f), circleColor(AREA), circleStrokeColor("#FFFFFF"), circleStrokeWidth(2f),
+            ),
+        )
 
         s.addLayer(
             LineLayer("sar-track", SRC_TRACK).withProperties(
@@ -302,6 +355,9 @@ private class MapHolder(context: Context) {
 
     private companion object {
         const val TAG = "SAR-Mapa"
+        const val SRC_AREA = "sar-area-src"
+        const val SRC_DRAFT = "sar-draft-src"
+        const val SRC_DRAFT_PTS = "sar-draft-pts-src"
         const val SRC_TRACK = "sar-track-src"
         const val SRC_NAV = "sar-nav-src"
         const val SRC_ALERTS = "sar-alerts-src"
@@ -315,6 +371,7 @@ private class MapHolder(context: Context) {
         const val CONFIRMED = "#FB5D7A"
         const val DISMISSED = "#657289"
         const val OPERATOR = "#22D3EE"
+        const val AREA = "#2DD4BF"
 
         const val EMPTY = """{"type":"FeatureCollection","features":[]}"""
 
@@ -323,6 +380,9 @@ private class MapHolder(context: Context) {
         fun lineString(pts: List<GeoPoint>): String =
             if (pts.size < 2) EMPTY
             else """{"type":"Feature","properties":{},"geometry":{"type":"LineString","coordinates":[${pts.joinToString(",") { coord(it) }}]}}"""
+
+        fun polygon(pts: List<GeoPoint>): String =
+            """{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[${(pts + pts.first()).joinToString(",") { coord(it) }}]]}}"""
 
         /** Puntos con propiedades ya escritas en JSON (sin llaves). */
         fun points(items: List<Pair<GeoPoint, String>>): String =

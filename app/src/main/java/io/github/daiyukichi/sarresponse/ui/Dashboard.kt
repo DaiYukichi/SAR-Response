@@ -31,13 +31,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +64,8 @@ import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
+import io.github.daiyukichi.sarresponse.core.Search
+import io.github.daiyukichi.sarresponse.core.SearchArea
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -87,6 +86,7 @@ private val Operator = Color(0xFF22D3EE)
 private val Pending = Color(0xFFFBBF24)
 private val Confirmed = Color(0xFFFB5D7A)
 private val Dismissed = Color(0xFF657289)
+private val AreaColor = Color(0xFF2DD4BF)
 
 /** Tiempo en que los botones de las tarjetas ignoran toques tras reordenarse la lista. */
 private const val REORDER_GUARD_MS = 800L
@@ -102,11 +102,16 @@ fun DashboardScreen(
     heading: Float?,
     toast: String?,
     mapRevision: Int,
+    search: Search?,
+    onSearchClick: () -> Unit,
     onSourceClick: () -> Unit,
     onDecide: (Long, AlertStatus) -> Unit,
     onShare: (Alert) -> Unit,
-    onExportGpx: () -> Unit,
-    onExportCsv: () -> Unit,
+    draft: List<GeoPoint>?,
+    onMapTap: (GeoPoint) -> Unit,
+    onDraftUndo: () -> Unit,
+    onDraftCancel: () -> Unit,
+    onDraftConfirm: () -> Unit,
 ) {
     var showPanel by rememberSaveable { mutableStateOf(false) }
     var mapIsMain by rememberSaveable { mutableStateOf(true) }
@@ -123,8 +128,19 @@ fun DashboardScreen(
     val navTarget = mission.alerts.firstOrNull { it.id == navTargetId && it.status != AlertStatus.DISMISSED }
     LaunchedEffect(navTarget == null) { if (navTarget == null) navTargetId = null }
 
+    // Para dibujar el área hace falta ver el mapa grande.
+    LaunchedEffect(draft != null) {
+        if (draft != null) {
+            showPanel = false
+            mapIsMain = true
+        }
+    }
+    val area = search?.area
+    val drone = mission.dronePosition
+    val droneOutside = area != null && drone != null && !area.contains(drone)
+
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
-        StatusHeader(mission, link, now, showPanel, { showPanel = it }, onSourceClick, onExportGpx, onExportCsv)
+        StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick)
 
         // El panel se dibuja ENCIMA de la vista de operación: así el mapa nunca se destruye
         // y al volver conserva zoom y posición.
@@ -144,12 +160,36 @@ fun DashboardScreen(
                         mapRevision = mapRevision,
                         onAlertClick = { selectedAlertId = it },
                         modifier = if (mapIsMain) main else pip,
+                        area = area,
+                        draft = draft,
+                        onMapTap = onMapTap,
                     )
                     VideoPane(compact = mapIsMain, modifier = if (mapIsMain) pip else main)
                     // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
                     Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
 
-                    if (mapIsMain && navTarget == null) {
+                    if (draft != null) {
+                        DraftBanner(
+                            vertices = draft,
+                            onUndo = onDraftUndo,
+                            onCancel = onDraftCancel,
+                            onConfirm = onDraftConfirm,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).zIndex(8f),
+                        )
+                    } else if (droneOutside) {
+                        Surface(
+                            color = Danger, shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp).zIndex(6f),
+                        ) {
+                            Text(
+                                "⚠ El dron está FUERA del área de búsqueda",
+                                color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+
+                    if (mapIsMain && navTarget == null && draft == null) {
                         Legend(showOperator = operator != null, modifier = Modifier.align(Alignment.TopStart).padding(10.dp).zIndex(4f))
                     }
 
@@ -182,6 +222,7 @@ fun DashboardScreen(
                 AlertPanel(
                     mission = mission,
                     operator = operator,
+                    area = area,
                     selectedId = selectedAlertId,
                     onSelect = {
                         selectedAlertId = it
@@ -197,7 +238,7 @@ fun DashboardScreen(
                 )
             }
             if (showPanel) {
-                PanelScreen(mission, operator, now, Modifier.fillMaxSize().zIndex(10f))
+                PanelScreen(mission, operator, now, search, Modifier.fillMaxSize().zIndex(10f))
             }
         }
     }
@@ -221,33 +262,18 @@ private fun StatusHeader(
     now: Long,
     showPanel: Boolean,
     onShowPanel: (Boolean) -> Unit,
+    search: Search?,
+    onSearchClick: () -> Unit,
     onSourceClick: () -> Unit,
-    onExportGpx: () -> Unit,
-    onExportCsv: () -> Unit,
 ) {
-    var exportMenu by remember { mutableStateOf(false) }
     Surface(color = Surface1, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Tabs(showPanel, onShowPanel)
-                Spacer(Modifier.weight(1f))
-                Box {
-                    TextButton(onClick = { exportMenu = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Text("Exportar", color = Primary, fontSize = 12.sp)
-                    }
-                    DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("GPX: detecciones y recorrido (mapas)") },
-                            onClick = { exportMenu = false; onExportGpx() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("CSV: detecciones y decisiones (informe)") },
-                            onClick = { exportMenu = false; onExportCsv() },
-                        )
-                    }
-                }
                 SourceChip(link, onSourceClick)
             }
+            Spacer(Modifier.height(6.dp))
+            SearchChip(search, onSearchClick)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val age = mission.lastPacketAtMillis?.let { now - it }
@@ -277,6 +303,83 @@ private fun StatusHeader(
         }
     }
 }
+
+/** Búsqueda en curso; tocarla abre la lista de búsquedas (crear, abrir, terminar, exportar). */
+@Composable
+private fun SearchChip(search: Search?, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Bg)
+            .border(1.dp, if (search == null) Warn.copy(alpha = 0.6f) else Line, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("BÚSQUEDA", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            search?.name ?: "Ninguna · toca para crear una",
+            color = if (search == null) Warn else Ink,
+            fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        search?.area?.let {
+            Text(formatArea(it.areaSquareMeters), color = AreaColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+        }
+        Text("▾", color = Muted)
+    }
+}
+
+/** Instrucciones y acciones mientras se dibuja el área de una búsqueda nueva. */
+@Composable
+private fun DraftBanner(
+    vertices: List<GeoPoint>,
+    onUndo: () -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface1.copy(alpha = 0.95f))
+            .border(1.5.dp, AreaColor, RoundedCornerShape(14.dp))
+            .padding(12.dp),
+    ) {
+        Text("Dibuja el área de búsqueda", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        val info = when {
+            vertices.isEmpty() -> "Toca el mapa para marcar cada esquina del área."
+            vertices.size < 3 -> "${vertices.size} punto(s). Faltan ${3 - vertices.size} como mínimo."
+            else -> "${vertices.size} puntos · " +
+                formatArea(io.github.daiyukichi.sarresponse.core.SearchArea(vertices).areaSquareMeters)
+        }
+        Text(info, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(
+                onClick = onCancel, border = BorderStroke(1.dp, Line),
+                contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
+            ) { Text("Cancelar", color = Muted, fontSize = 12.sp) }
+            OutlinedButton(
+                onClick = onUndo, enabled = vertices.isNotEmpty(), border = BorderStroke(1.dp, Line),
+                contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
+            ) { Text("Deshacer", color = Muted, fontSize = 12.sp) }
+            Spacer(Modifier.weight(1f))
+            Button(
+                onClick = onConfirm, enabled = vertices.size >= 3,
+                colors = ButtonDefaults.buttonColors(containerColor = AreaColor, contentColor = Color(0xFF042F2A)),
+                contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(36.dp),
+            ) { Text("Crear búsqueda", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+        }
+    }
+}
+
+fun formatArea(m2: Double): String =
+    if (m2 < 1_000_000) String.format(Locale.ROOT, "%.1f ha", m2 / 10_000)
+    else String.format(Locale.ROOT, "%.2f km²", m2 / 1_000_000)
 
 /** Selector Operación / Panel. */
 @Composable
@@ -464,6 +567,7 @@ private fun DirectionArrow(degrees: Float, color: Color, modifier: Modifier = Mo
 private fun AlertPanel(
     mission: MissionState,
     operator: GeoPoint?,
+    area: SearchArea?,
     selectedId: Long?,
     onSelect: (Long) -> Unit,
     onDecide: (Long, AlertStatus) -> Unit,
@@ -533,6 +637,7 @@ private fun AlertPanel(
                         AlertCard(
                             alert = a,
                             operator = operator,
+                            outsideArea = area != null && a.packet.position?.let { !area.contains(it) } == true,
                             selected = a.id == selectedId,
                             onSelect = onSelect,
                             onDecide = { id, st ->
@@ -557,6 +662,7 @@ private fun AlertPanel(
 private fun AlertCard(
     alert: Alert,
     operator: GeoPoint?,
+    outsideArea: Boolean,
     selected: Boolean,
     onSelect: (Long) -> Unit,
     onDecide: (Long, AlertStatus) -> Unit,
@@ -588,6 +694,10 @@ private fun AlertCard(
                 color = confidenceColor(p.confidence), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
             )
             Spacer(Modifier.weight(1f))
+            if (outsideArea) {
+                Text("FUERA DEL ÁREA", color = Warn, fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.width(6.dp))
+            }
             StatusTag(alert.status)
         }
         Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {

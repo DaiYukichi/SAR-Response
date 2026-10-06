@@ -22,8 +22,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
@@ -39,8 +42,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.daiyukichi.sarresponse.core.Alert
@@ -48,21 +56,25 @@ import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.CsvExporter
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
+import io.github.daiyukichi.sarresponse.core.Search
+import io.github.daiyukichi.sarresponse.core.SearchArea
 import io.github.daiyukichi.sarresponse.link.BluetoothSppSource
 import io.github.daiyukichi.sarresponse.ui.DashboardScreen
+import io.github.daiyukichi.sarresponse.ui.NewSearchDialog
 import io.github.daiyukichi.sarresponse.ui.OfflineMap
+import io.github.daiyukichi.sarresponse.ui.SearchesDialog
 import io.github.daiyukichi.sarresponse.ui.formatDistance
 import io.github.daiyukichi.sarresponse.ui.formatUtc
 import io.github.daiyukichi.sarresponse.ui.rememberDeviceHeading
 import io.github.daiyukichi.sarresponse.ui.rememberOperatorLocation
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     private val vm: MissionViewModel by viewModels()
@@ -80,8 +92,19 @@ class MainActivity : ComponentActivity() {
                 val mission by vm.mission.collectAsStateWithLifecycle()
                 val link by vm.link.collectAsStateWithLifecycle()
                 val demoOperator by vm.demoOperator.collectAsStateWithLifecycle()
+                val activeSearch by vm.activeSearch.collectAsStateWithLifecycle()
+                val searches by vm.searches.collectAsStateWithLifecycle()
+                var showSearches by remember { mutableStateOf(false) }
+                var showNewSearch by remember { mutableStateOf(false) }
+                // Búsqueda en preparación: nombre y barrido ya elegidos, vértices que se van tocando.
+                var draftName by remember { mutableStateOf("") }
+                var draftSwath by remember { mutableStateOf(Search.DEFAULT_SWATH_METERS) }
+                var draft by remember { mutableStateOf<List<GeoPoint>?>(null) }
                 var showSources by remember { mutableStateOf(false) }
                 var permissionsAsked by remember { mutableStateOf(0) }
+                // El mapa se crea recién después de resolver los permisos: si el aviso de permisos
+                // pausa la app mientras MapLibre se inicia, el mapa queda en blanco.
+                var startupReady by remember { mutableStateOf(missingPermissions().isEmpty()) }
                 var toast by remember { mutableStateOf<String?>(null) }
                 var mapRevision by remember { mutableStateOf(0) }
                 var hasImportedMap by remember { mutableStateOf(OfflineMap.hasImported(this)) }
@@ -91,6 +114,7 @@ class MainActivity : ComponentActivity() {
                     ActivityResultContracts.RequestMultiplePermissions(),
                 ) {
                     permissionsAsked++
+                    startupReady = true
                 }
 
                 // Al abrir, pedir de una vez ubicación y Bluetooth: el mapa arranca donde está el operador.
@@ -149,29 +173,71 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                DashboardScreen(
-                    mission = mission,
-                    link = link,
-                    operator = operator,
-                    heading = heading,
-                    toast = toast,
-                    mapRevision = mapRevision,
-                    onSourceClick = {
-                        val missing = missingPermissions()
-                        if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
-                        showSources = true
-                    },
-                    onDecide = vm::decide,
-                    onShare = { shareAlert(it, operator) },
-                    onExportGpx = {
-                        val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
-                        exportGpx.launch("sar-$stamp.gpx")
-                    },
-                    onExportCsv = {
-                        val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
-                        exportCsv.launch("sar-detecciones-$stamp.csv")
-                    },
-                )
+                if (!startupReady) {
+                    StartupScreen()
+                } else {
+                    DashboardScreen(
+                        mission = mission,
+                        link = link,
+                        operator = operator,
+                        heading = heading,
+                        toast = toast,
+                        mapRevision = mapRevision,
+                        onSourceClick = {
+                            val missing = missingPermissions()
+                            if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
+                            showSources = true
+                        },
+                        onDecide = vm::decide,
+                        onShare = { shareAlert(it, operator) },
+                        search = activeSearch,
+                        onSearchClick = { showSearches = true },
+                        draft = draft,
+                        onMapTap = { p -> draft = draft?.plus(p) },
+                        onDraftUndo = { draft = draft?.dropLast(1) },
+                        onDraftCancel = { draft = null },
+                        onDraftConfirm = {
+                            draft?.takeIf { it.size >= 3 }?.let { vm.createSearch(draftName, SearchArea(it), draftSwath) }
+                            draft = null
+                        },
+                    )
+                }
+
+                if (showSearches) {
+                    SearchesDialog(
+                        active = activeSearch,
+                        searches = searches,
+                        onNew = { showSearches = false; showNewSearch = true },
+                        onOpen = { vm.openSearch(it); showSearches = false },
+                        onFinish = { vm.finishSearch(); showSearches = false },
+                        onDelete = vm::deleteSearch,
+                        onExportGpx = {
+                            showSearches = false
+                            exportGpx.launch("${fileStem(activeSearch)}.gpx")
+                        },
+                        onExportCsv = {
+                            showSearches = false
+                            exportCsv.launch("${fileStem(activeSearch)}-detecciones.csv")
+                        },
+                        onDismiss = { showSearches = false },
+                    )
+                }
+                if (showNewSearch) {
+                    NewSearchDialog(
+                        suggestedName = "Búsqueda ${searches.size + 1}",
+                        onDrawArea = { name, swath ->
+                            draftName = name
+                            draftSwath = swath
+                            draft = emptyList()
+                            showNewSearch = false
+                        },
+                        onCreateWithoutArea = { name, swath ->
+                            vm.createSearch(name, null, swath)
+                            showNewSearch = false
+                        },
+                        onDismiss = { showNewSearch = false },
+                    )
+                }
 
                 if (showSources) {
                     SourceDialog(
@@ -203,6 +269,13 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         tone?.release()
         super.onDestroy()
+    }
+
+    /** Nombre de archivo a partir de la búsqueda: sin espacios ni caracteres raros. */
+    private fun fileStem(search: Search?): String {
+        val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
+        val name = search?.name?.lowercase()?.replace(Regex("[^a-z0-9áéíóúñ]+"), "-")?.trim('-').orEmpty()
+        return listOf("sar", name, stamp).filter { it.isNotEmpty() }.joinToString("-")
     }
 
     /** Comparte por WhatsApp, SMS, correo, etc. un texto que se entiende sin la app. */
@@ -324,4 +397,19 @@ private fun SourceDialog(
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
         dismissButton = { TextButton(onClick = onStop) { Text("Desconectar") } },
     )
+}
+
+/** Pantalla mientras se responden los permisos del primer arranque. */
+@Composable
+private fun StartupScreen() {
+    Box(Modifier.fillMaxSize().background(Color(0xFF0E1623)).padding(32.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("SAR-Response", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Text(
+                "Permite la ubicación (tu posición en el mapa y la distancia a cada detección) " +
+                    "y el Bluetooth (la estación tierra). La app funciona sin internet.",
+                color = Color(0xFF9FB0C4), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp),
+            )
+        }
+    }
 }

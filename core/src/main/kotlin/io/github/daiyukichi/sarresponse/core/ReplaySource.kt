@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.flow
  * Las coordenadas por defecto son un punto genérico, no un lugar de pruebas real.
  */
 class ReplaySource(
-    private val center: GeoPoint = GeoPoint(8.4333, -82.4333),
+    val center: GeoPoint = GeoPoint(8.4333, -82.4333),
     private val speedup: Double = 10.0,
     private val unit: String = "A1",
 ) : LinkSource {
