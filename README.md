@@ -54,8 +54,9 @@ pensada para ese punto medio:
 
 - **La IA propone, la persona decide.** Cada detección llega como *pendiente* y el operador
   la confirma o la descarta mirando el video y el contexto.
-- **Funciona sin cobertura.** Zonas de desastre, montaña o selva rara vez tienen datos
-  móviles. El enlace es LoRa + Bluetooth y los mapas pueden ir precargados en el teléfono.
+- **Funciona 100 % sin internet.** Zonas de desastre, montaña o selva rara vez tienen datos
+  móviles. El enlace es LoRa + Bluetooth y el mapa va dentro de la app. **La app ni siquiera
+  tiene permiso de internet**: es imposible que dependa de la red.
 - **Hardware barato y común.** Un teléfono Android, un ESP32, un módulo LoRa E32 y un
   receptor de video FPV de los que se usan en drones de carreras.
 
@@ -74,14 +75,17 @@ pensada para ese punto medio:
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
 | **Exportar GPX** | Detecciones confirmadas y pendientes (las descartadas no) como waypoints, más el recorrido del dron. Se abre en OsmAnd, Google Earth, QGIS, Garmin, etc. |
-| **Mapas offline** | Si hay un archivo `.mbtiles` en el teléfono, la app no usa internet para el mapa. |
+| **Mapa offline** | Mapa vectorial de OpenStreetMap (Chiriquí incluido, ~20 MB) con calles, lugares y nombres en español. Se puede importar el de otra zona. Nada se descarga en campo. |
+| **Arranque listo** | Al abrir, pide de una vez los permisos de ubicación y Bluetooth, y el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
 | **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
 
 ## Cómo se usa en campo
 
 1. **Antes de salir**
-   - Si no habrá internet, copia el mapa del área (`.mbtiles`) al teléfono ([ver abajo](#mapas-sin-internet)).
+   - Si la búsqueda es fuera de Chiriquí, importa el mapa de esa zona ([ver abajo](#mapas-sin-internet)).
+   - Abre la app con cielo despejado unos minutos antes: sin internet, el primer fix del GPS
+     del teléfono puede tardar de 30 s a unos minutos.
    - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
      *Ajustes → Bluetooth*.
 2. **En el punto de despegue**
@@ -231,9 +235,12 @@ SAR-Response/
 │       ├── link/BluetoothSppSource.kt  Bluetooth clásico (RFCOMM/SPP)
 │       └── ui/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
-│           ├── MapPane.kt     Mapa osmdroid (online u offline con MBTiles)
+│           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
+│           ├── OfflineMap.kt  Archivo .pmtiles local, importación y estilo offline
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista de video (marcador hasta integrar UVC)
+├── app/src/main/assets/mapa/  Estilo, letras e íconos del mapa (y region.pmtiles, generado)
+├── tools/mapa/                Scripts para generar el mapa offline y su estilo
 ├── firmware/esp32-bt-bridge/  Sketch Arduino del puente LoRa → Bluetooth
 └── docs/img/                  Capturas para este README
 ```
@@ -254,11 +261,14 @@ interface LinkSource {
 ```
 
 **Tecnologías:** Kotlin 2.4 · Jetpack Compose (Material 3) · Coroutines/StateFlow ·
-[osmdroid](https://github.com/osmdroid/osmdroid) · Android Gradle Plugin 9 · minSdk 26 (Android 8.0).
+[MapLibre Native](https://maplibre.org) + [PMTiles](https://protomaps.com) · Android Gradle Plugin 9 · minSdk 26 (Android 8.0).
 
 ## Compilar e instalar
 
-Requisitos: Android Studio reciente (con AGP 9) y JDK 17 o superior.
+Requisitos: Android Studio reciente (con AGP 9) y JDK 17 o superior. El mapa no se sube al
+repositorio por su tamaño: genéralo una vez con `tools/mapa/descargar_mapa.sh` (ver
+[Mapas sin internet](#mapas-sin-internet)). Si no lo generas, la app compila igual y funciona
+sin mapa base.
 
 ```bash
 git clone https://github.com/DaiYukichi/SAR-Response.git
@@ -294,21 +304,35 @@ también por USB para depurar.
 
 ## Mapas sin internet
 
-Sin configuración extra, la app descarga teselas de OpenStreetMap y las guarda en caché.
-**No confíes en la caché para una operación real**: precarga el área.
+El mapa es **vectorial y local**: un archivo `.pmtiles` con datos de OpenStreetMap (vía
+[Protomaps](https://protomaps.com)), dibujado con [MapLibre](https://maplibre.org). Las letras y
+los íconos del mapa también van dentro de la app, así que **nada se descarga nunca**.
 
-1. Genera un archivo `.mbtiles` del área de búsqueda, por ejemplo con
-   [Mobile Atlas Creator](https://mobac.sourceforge.io/) (formato *MBTiles SQLite*) o con QGIS
-   (*Generar teselas XYZ (MBTiles)*). Zoom 12–18 suele bastar.
-2. Copia el archivo al teléfono en:
-   `Android/data/io.github.daiyukichi.sarresponse/files/mapas/`
-3. Abre la app: si encuentra un `.mbtiles` ahí, lo usa y desactiva la descarga por red.
+- **Incluido:** Chiriquí completo (~20 MB, detalle hasta nivel de calle). Al primer arranque se
+  copia al almacenamiento interno; por eso la primera vez el mapa puede tardar unos segundos.
+- **Otra zona:** en **Elegir fuente → Importar mapa (.pmtiles)…** eliges un archivo que ya esté
+  en el teléfono (Descargas, memoria USB, etc.). **Volver al mapa incluido** lo deshace.
+- **Sin ningún mapa:** la app sigue funcionando; recorrido, pines, distancias y navegación se
+  dibujan sobre un fondo liso.
 
-Los archivos `.mbtiles` no se suben a este repositorio porque pesan mucho. Si los generas a
-partir de OpenStreetMap, respeta su licencia
-([ODbL](https://www.openstreetmap.org/copyright)) y su
-[política de uso de teselas](https://operations.osmfoundation.org/policies/tiles/), que no
-permite descargas masivas desde sus servidores.
+### Generar el mapa de una zona (en la computadora, con internet)
+
+Necesitas la herramienta [`pmtiles`](https://github.com/protomaps/go-pmtiles/releases).
+
+```bash
+tools/mapa/descargar_mapa.sh                              # Chiriquí (por defecto)
+tools/mapa/descargar_mapa.sh "-82.52,8.36,-82.35,8.50"    # otra zona: oeste,sur,este,norte
+```
+
+El script recorta solo la zona pedida del mapa mundial diario de Protomaps y la deja en
+`app/src/main/assets/mapa/region.pmtiles`, que se empaqueta al compilar. Para usarlo como mapa
+importado en vez de compilarlo, copia ese archivo al teléfono e impórtalo desde la app.
+
+> No se usan los servidores de teselas de OpenStreetMap: su
+> [política](https://operations.osmfoundation.org/policies/tiles/) prohíbe las descargas masivas.
+
+El estilo del mapa (tema oscuro, etiquetas en español) se genera con
+`cd tools/mapa && npm install && npm run estilo`.
 
 ## Modo demo
 
@@ -330,9 +354,10 @@ cambiar en `ReplaySource.kt`.
 |---|---|
 | Bluetooth (conectar) | Hablar con la estación tierra. |
 | Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
-| Internet | Solo para descargar teselas del mapa cuando no hay `.mbtiles`. |
 | Vibración | Avisar de nuevas detecciones. |
 
+- **Sin internet, por diseño.** El manifiesto elimina los permisos de red (incluidos los que
+  agrega la librería del mapa), así que Android no deja que la app use la red.
 - **Todo se queda en el teléfono.** La app no tiene servidor, cuentas, analíticas ni
   publicidad. Los datos solo salen si el operador exporta un GPX o comparte una detección.
 - **El payload no transmite imágenes de personas por LoRa**, solo coordenadas, confianza y hora.
@@ -354,6 +379,8 @@ cambiar en `ReplaySource.kt`.
   un instante tras cada reordenamiento.
 - **Compartir como texto plano:** lo entiende cualquier persona en cualquier app, incluso sin
   SAR-Response instalada.
+- **Mapa vectorial en vez de imágenes:** Chiriquí entero pesa ~20 MB, se ve nítido a cualquier
+  zoom y los nombres se pueden mostrar en español.
 - **Mapa y video siempre montados:** al intercambiarlos solo cambia su tamaño, así el mapa no
   se recarga ni pierde el zoom.
 
@@ -368,6 +395,10 @@ cambiar en `ReplaySource.kt`.
   es pequeña en Panamá (unos 2°), pero en otras regiones puede ser mayor. Además, las brújulas de
   los teléfonos se descalibran cerca de metales: si la flecha no tiene sentido, haz un "8" con el
   teléfono.
+- El mapa incluido tiene detalle hasta nivel de calle (zoom 15); más cerca se amplía el mismo
+  detalle. No incluye imágenes satelitales.
+- El APK de depuración pesa ~80 MB porque incluye el mapa y el motor de mapas para todos los
+  tipos de procesador; una versión de publicación por procesador pesa bastante menos.
 - La distancia y el rumbo son en línea recta; no consideran el terreno ni los caminos.
 - La app asume una sola estación tierra a la vez.
 - Interfaz solo en español por ahora.
@@ -429,5 +460,8 @@ también el firmware del payload y la sección [Protocolo](#protocolo-de-los-paq
 
 Código bajo licencia [Apache-2.0](LICENSE).
 
-Datos de mapas © [colaboradores de OpenStreetMap](https://www.openstreetmap.org/copyright),
-disponibles bajo la licencia ODbL.
+- Datos de mapas © [colaboradores de OpenStreetMap](https://www.openstreetmap.org/copyright),
+  licencia ODbL, procesados por [Protomaps](https://protomaps.com).
+- Letras Noto Sans: [SIL Open Font License](app/src/main/assets/mapa/licencias/fuentes-OFL.txt).
+- Íconos del mapa: derivados de [tangrams/icons](https://github.com/tangrams/icons), licencia
+  [MIT](app/src/main/assets/mapa/licencias/iconos-MIT.md).

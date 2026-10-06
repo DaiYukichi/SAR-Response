@@ -28,6 +28,10 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // El mapa se copia tal cual al almacenamiento interno; comprimirlo solo haría más lento el primer arranque.
+        noCompress += "pmtiles"
+    }
 }
 
 dependencies {
@@ -43,6 +47,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.osmdroid)
+    implementation(libs.maplibre)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

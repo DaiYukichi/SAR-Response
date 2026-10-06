@@ -6,7 +6,7 @@ lifecycle = "2.10.0"
 activityCompose = "1.13.0"
 composeBom = "2024.09.00"
 coroutines = "1.11.0"
-osmdroid = "6.1.20"
+maplibre = "13.6.1"
 junit = "4.13.2"
 
 [libraries]
@@ -24,7 +24,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
+maplibre = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

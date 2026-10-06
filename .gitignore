@@ -18,8 +18,10 @@ keystore.properties
 secrets.properties
 google-services.json
 
-# Teselas offline (pesadas; ver README)
+# Mapas offline (pesados; se generan con tools/mapa/descargar_mapa.sh, ver README)
 *.mbtiles
+*.pmtiles
 *.sqlite
+node_modules/
 
 .DS_Store

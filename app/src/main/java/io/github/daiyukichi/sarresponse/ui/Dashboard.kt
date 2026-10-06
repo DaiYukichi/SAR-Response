@@ -99,6 +99,7 @@ fun DashboardScreen(
     operator: GeoPoint?,
     heading: Float?,
     toast: String?,
+    mapRevision: Int,
     onSourceClick: () -> Unit,
     onDecide: (Long, AlertStatus) -> Unit,
     onShare: (Alert) -> Unit,
@@ -121,7 +122,6 @@ fun DashboardScreen(
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
         StatusHeader(mission, link, now, onSourceClick, onExportGpx)
 
-        // osmdroid dibuja fuera de sus límites si no se recorta, tapando el encabezado.
         Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             val main = Modifier.fillMaxSize()
             val pip = pipModifier()
@@ -133,6 +133,7 @@ fun DashboardScreen(
                 operator = operator,
                 navTargetId = navTargetId,
                 pulse = (now / 1000) % 2 == 0L,
+                mapRevision = mapRevision,
                 onAlertClick = { selectedAlertId = it },
                 modifier = if (mapIsMain) main else pip,
             )

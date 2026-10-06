@@ -1,0 +1,7 @@
+{
+  "name": "sar-response-mapa",
+  "private": true,
+  "description": "Genera el estilo offline del mapa (Protomaps, tema oscuro, etiquetas en español).",
+  "scripts": { "estilo": "node generar_estilo.cjs" },
+  "dependencies": { "@protomaps/basemaps": "5.7.2" }
+}

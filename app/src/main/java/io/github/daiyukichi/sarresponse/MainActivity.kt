@@ -37,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -48,13 +49,17 @@ import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.link.BluetoothSppSource
 import io.github.daiyukichi.sarresponse.ui.DashboardScreen
+import io.github.daiyukichi.sarresponse.ui.OfflineMap
 import io.github.daiyukichi.sarresponse.ui.formatDistance
 import io.github.daiyukichi.sarresponse.ui.formatUtc
 import io.github.daiyukichi.sarresponse.ui.rememberDeviceHeading
 import io.github.daiyukichi.sarresponse.ui.rememberOperatorLocation
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -77,12 +82,34 @@ class MainActivity : ComponentActivity() {
                 var showSources by remember { mutableStateOf(false) }
                 var permissionsAsked by remember { mutableStateOf(0) }
                 var toast by remember { mutableStateOf<String?>(null) }
+                var mapRevision by remember { mutableStateOf(0) }
+                var hasImportedMap by remember { mutableStateOf(OfflineMap.hasImported(this)) }
+                val scope = rememberCoroutineScope()
 
                 val permissions = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),
                 ) {
                     permissionsAsked++
-                    showSources = true
+                }
+
+                // Al abrir, pedir de una vez ubicación y Bluetooth: el mapa arranca donde está el operador.
+                LaunchedEffect(Unit) {
+                    val missing = missingPermissions()
+                    if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
+                }
+
+                val importMap = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { runCatching { OfflineMap.import(this@MainActivity, uri) } }
+                        result.onSuccess {
+                            hasImportedMap = true
+                            mapRevision++
+                            Toast.makeText(this@MainActivity, "Mapa importado", Toast.LENGTH_SHORT).show()
+                        }.onFailure {
+                            Toast.makeText(this@MainActivity, it.message ?: "No se pudo importar", Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
 
                 // En la demo el operador está en el punto de despegue simulado; en campo, el GPS del teléfono.
@@ -117,11 +144,11 @@ class MainActivity : ComponentActivity() {
                     operator = operator,
                     heading = heading,
                     toast = toast,
+                    mapRevision = mapRevision,
                     onSourceClick = {
-                        val missing = requiredPermissions().filter {
-                            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-                        }
-                        if (missing.isEmpty()) showSources = true else permissions.launch(missing.toTypedArray())
+                        val missing = missingPermissions()
+                        if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
+                        showSources = true
                     },
                     onDecide = vm::decide,
                     onShare = { shareAlert(it, operator) },
@@ -141,6 +168,17 @@ class MainActivity : ComponentActivity() {
                         },
                         onStop = { vm.stop(); showSources = false },
                         onDismiss = { showSources = false },
+                        hasImportedMap = hasImportedMap,
+                        onImportMap = {
+                            showSources = false
+                            importMap.launch(arrayOf("*/*"))
+                        },
+                        onRemoveImportedMap = {
+                            OfflineMap.removeImported(this@MainActivity)
+                            hasImportedMap = false
+                            mapRevision++
+                            showSources = false
+                        },
                     )
                 }
             }
@@ -184,10 +222,11 @@ class MainActivity : ComponentActivity() {
         return "Detección #${alert.id} · $conf%$where"
     }
 
-    private fun requiredPermissions(): List<String> = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun missingPermissions(): List<String> = buildList {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+        add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(Manifest.permission.BLUETOOTH_CONNECT)
+    }.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
 
     /** Dispositivos ya emparejados en Ajustes > Bluetooth (la estación tierra se empareja una vez). */
     @SuppressLint("MissingPermission")
@@ -220,6 +259,9 @@ private fun SourceDialog(
     onDevice: (BluetoothDevice, String) -> Unit,
     onStop: () -> Unit,
     onDismiss: () -> Unit,
+    hasImportedMap: Boolean,
+    onImportMap: () -> Unit,
+    onRemoveImportedMap: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -245,6 +287,23 @@ private fun SourceDialog(
                     "Demo (misión simulada)",
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onDemo).padding(vertical = 10.dp),
                 )
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                Text("Mapa offline:", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    if (hasImportedMap) "Usando un mapa importado." else "Usando el mapa incluido (Chiriquí).",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "Importar mapa (.pmtiles)…",
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onImportMap).padding(vertical = 10.dp),
+                )
+                if (hasImportedMap) {
+                    Text(
+                        "Volver al mapa incluido",
+                        modifier = Modifier.fillMaxWidth().clickable(onClick = onRemoveImportedMap).padding(vertical = 10.dp),
+                    )
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
