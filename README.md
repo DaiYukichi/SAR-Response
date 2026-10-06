@@ -10,10 +10,11 @@ encuentra a alguien envía un aviso por **LoRa** con su posición GPS. Al mismo 
 video analógico por **5.8 GHz**.
 
 La app junta todo eso en una sola pantalla para que el operador pueda **ver dónde está el
-dron, dónde se detectó a alguien, mirar el video y decidir** si la detección es real.
+dron, dónde se detectó a alguien, mirar el video, decidir** si la detección es real y
+**guiar a quien va a pie** hasta esa persona.
 
 <p align="center">
-  <img src="docs/img/mapa.png" width="300" alt="Vista de mapa con recorrido del dron y detecciones">
+  <img src="docs/img/mapa.png" width="300" alt="Mapa con recorrido del dron, detecciones y navegación hacia la detección #3">
   &nbsp;&nbsp;
   <img src="docs/img/video.png" width="300" alt="Vista de video con el mapa en miniatura">
 </p>
@@ -38,7 +39,7 @@ dron, dónde se detectó a alguien, mirar el video y decidir** si la detección 
 - [Permisos y privacidad](#permisos-y-privacidad)
 - [Decisiones de diseño](#decisiones-de-diseño)
 - [Limitaciones conocidas](#limitaciones-conocidas)
-- [Hoja de ruta](#hoja-de-ruta)
+- [Trabajo futuro](#trabajo-futuro)
 - [Contribuir](#contribuir)
 - [Licencia](#licencia)
 
@@ -62,11 +63,14 @@ pensada para ese punto medio:
 
 | Función | Detalle |
 |---|---|
-| **Mapa en vivo** | Recorrido del dron (línea azul), posición actual (punto azul), un pin por cada detección y la posición del operador. |
+| **Mapa en vivo** | Recorrido del dron (línea azul), posición actual (punto azul), un pin por cada detección, la posición del operador (celeste) y una leyenda. Las detecciones pendientes "laten" para llamar la atención. |
 | **Video 5.8 GHz** | Video del VTX del payload con los recuadros de detección dibujados a bordo. *Integración UVC en desarrollo.* |
 | **Vistas intercambiables** | Video o mapa a pantalla completa, con la otra vista en miniatura (picture-in-picture). Tocar la miniatura las intercambia sin perder el zoom ni la posición del mapa. |
-| **Detecciones** | Lista con número, confianza de la IA, hora UTC y coordenadas. Botones **Confirmar** / **Descartar**. Las pendientes van primero. |
-| **Avisos** | Cada detección nueva suena y vibra, aunque el operador esté mirando el video. |
+| **Detecciones** | Tarjetas con número, confianza de la IA (con color), hora UTC, coordenadas y **distancia y rumbo desde el operador** ("293 m · N 7°"). Botones **Confirmar** / **Descartar**. Las pendientes van primero. |
+| **Navegar a una detección** | Banner con la distancia, el rumbo y una flecha que apunta hacia la persona **según hacia dónde mira el teléfono** (brújula), más una línea punteada en el mapa del operador al objetivo. |
+| **Compartir coordenadas** | En una detección confirmada, envía por WhatsApp, SMS, correo, etc. un texto que se entiende sin la app: coordenadas, distancia y rumbo desde el operador, enlace a OpenStreetMap y enlace `geo:`. |
+| **Avisos** | Cada detección nueva suena, vibra y muestra un mensaje con su confianza, distancia y dirección ("Detección #1 · 87% · 293 m N"), aunque el operador esté mirando el video. |
+| **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
 | **Exportar GPX** | Detecciones confirmadas y pendientes (las descartadas no) como waypoints, más el recorrido del dron. Se abre en OsmAnd, Google Earth, QGIS, Garmin, etc. |
@@ -82,29 +86,33 @@ pensada para ese punto medio:
      *Ajustes → Bluetooth*.
 2. **En el punto de despegue**
    - Enciende la estación tierra y el payload.
-   - Abre SAR-Response, toca el indicador **Sin fuente** (arriba a la izquierda) y elige
-     **SAR-Estacion**. Concede los permisos que pida.
-   - Espera a ver *LoRa: hace N s* en verde y *GPS: fix* antes de despegar.
+   - Abre SAR-Response, toca **Elegir fuente** (arriba a la derecha) y elige
+     **SAR-Estacion**. Concede los permisos de Bluetooth y ubicación.
+   - Espera a ver *Enlace LoRa* en verde y *GPS payload: fix* antes de despegar.
    - Si usas video, conecta el receptor 5.8 GHz al teléfono por OTG.
 3. **Durante el vuelo**
    - Cuando suene una alerta, toca la detección en la lista: el mapa se centra en ella.
    - Mira el video y decide: **Confirmar** (pin rojo) o **Descartar** (pin gris).
-4. **Al terminar o al pasar coordenadas a un equipo de tierra**
-   - Toca **Exportar GPX** y compártelo, o dicta las coordenadas que aparecen en cada detección.
+4. **Para llegar a la persona**
+   - Toca **➤ Navegar a** en la detección: la flecha del banner apunta hacia ella y la
+     distancia se actualiza mientras caminas.
+   - O toca **Compartir coordenadas** para mandárselas al equipo que va a pie.
+5. **Al terminar**
+   - Toca **Exportar GPX** para guardar las detecciones y el recorrido.
 
 ## La pantalla, parte por parte
 
-### Barra de estado (arriba)
+### Encabezado (arriba)
 
 | Indicador | Verde | Ámbar | Rojo | Gris |
 |---|---|---|---|---|
-| **Fuente** (tocable) | Conectado a la estación tierra o a la demo | Conectando… | Reintentando tras una caída | Sin fuente elegida |
-| **LoRa: hace N s** | Último paquete hace < 35 s | 35–65 s (se perdió un latido) | > 65 s: enlace con el dron probablemente caído | Aún no llega nada |
-| **GPS** | El payload tiene fix | El payload no tiene fix (las alertas llegarán sin posición) | — | Sin latidos todavía |
+| **Fuente** (botón arriba a la derecha) | Conectado a la estación tierra o a la demo | Conectando… | Reintentando tras una caída | Ninguna fuente elegida |
+| **Enlace LoRa: hace N s** | Último paquete hace < 35 s | 35–65 s (se perdió un latido) | > 65 s: enlace con el dron probablemente caído | Aún no llega nada |
+| **GPS payload** | El payload tiene fix | El payload no tiene fix (las alertas llegarán sin posición) | — | Sin latidos todavía |
 
 Los umbrales de LoRa salen del latido del payload, que llega cada 30 s.
 
-Debajo: **paquetes recibidos · perdidos · corruptos**.
+Debajo: **paquetes recibidos · perdidos · corruptos**. Arriba a la derecha está **Exportar GPX**.
 - *Perdidos* se calcula con el número de secuencia: si después del 41 llega el 44, se
   perdieron 2.
 - *Corruptos* son líneas con checksum inválido o mal formadas (ruido de radio).
@@ -117,17 +125,31 @@ entre el teléfono y la estación, o entre la estación y el dron.
 - **Mapa**:
   - Línea azul: recorrido del dron.
   - Punto azul grande: última posición conocida.
-  - Pines: 🟠 pendiente · 🔴 confirmada · ⚪ descartada. El pin seleccionado se ve más grande.
+  - Punto celeste: el operador (el teléfono).
+  - Pines: 🟠 pendiente (con un halo que late) · 🔴 confirmada · ⚪ descartada. El seleccionado
+    lleva un anillo azul.
+  - Línea roja punteada: del operador a la detección hacia la que se está navegando.
   - Tocar un pin lo selecciona en la lista.
-- **Video**: imagen del VTX del payload (pendiente de integrar, ver [hoja de ruta](#hoja-de-ruta)).
+- **Banner de navegación** (abajo del mapa): distancia, punto cardinal, grados y una flecha.
+  - Si el teléfono tiene brújula, la flecha apunta hacia la persona **según hacia dónde mira el
+    teléfono**: basta con girar hasta que apunte hacia adelante y caminar.
+  - Sin brújula, el rumbo se da respecto al norte, y el banner lo indica.
+- **Video**: imagen del VTX del payload (pendiente de integrar, ver [trabajo futuro](#trabajo-futuro)).
 - **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video.
 
 ### Panel de detecciones (abajo)
 
 - El encabezado muestra el total y cuántas están **por revisar**. Tócalo para plegar o desplegar.
-- Cada fila muestra `#número · confianza · hora UTC` y las coordenadas.
-- Tocar una fila centra el mapa en esa detección. Si estabas viendo el video, cambia al mapa.
-- Las pendientes siempre van arriba y la lista sube sola cuando llega una nueva.
+- Cada tarjeta muestra el número, la confianza de la IA y su estado; debajo, la distancia y el
+  rumbo desde el operador, la hora UTC y las coordenadas.
+- **Confianza con color:** ≥ 80 % rosado (alta), 60–79 % ámbar (media), < 60 % gris (baja; mírala con
+  más cuidado en el video).
+- Botones según el estado:
+  - Pendiente: **✓ Confirmar**, **✕ Descartar** y **➤** (navegar).
+  - Confirmada: **➤ Navegar a** y **Compartir coordenadas**.
+- Tocar una tarjeta centra el mapa en esa detección. Si estabas viendo el video, cambia al mapa.
+- Las pendientes siempre van arriba. Después de cada decisión la lista vuelve arriba, donde quedan
+  las que faltan revisar. Si hay tarjetas fuera de la vista, aparece **↑ Ver más**.
 
 ## Arquitectura del sistema
 
@@ -201,7 +223,7 @@ SAR-Response/
 │       ├── LinkSource.kt      Interfaz de cualquier origen de datos (Flow<String>)
 │       ├── ReplaySource.kt    Misión simulada para demos
 │       ├── GpxExporter.kt     Exportación GPX 1.1
-│       └── Geo.kt             Distancia, rumbo y desplazamientos geográficos
+│       └── Geo.kt             Distancia, rumbo, punto cardinal y desplazamientos
 ├── app/                       Aplicación Android (Jetpack Compose)
 │   └── src/main/java/.../sarresponse/
 │       ├── MainActivity.kt    Permisos, elección de fuente, avisos, exportación
@@ -210,6 +232,7 @@ SAR-Response/
 │       └── ui/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
 │           ├── MapPane.kt     Mapa osmdroid (online u offline con MBTiles)
+│           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista de video (marcador hasta integrar UVC)
 ├── firmware/esp32-bt-bridge/  Sketch Arduino del puente LoRa → Bluetooth
 └── docs/img/                  Capturas para este README
@@ -293,7 +316,9 @@ En el selector de fuente, **Demo (misión simulada)** reproduce una misión de u
 
 - el dron barre el área en pasadas paralelas (patrón de "cortadora de césped"),
 - llegan latidos con posición y 4 detecciones con distintas confianzas,
-- se simula la pérdida de un paquete, que aparece en el contador de *perdidos*.
+- se simula la pérdida de un paquete, que aparece en el contador de *perdidos*,
+- el operador queda en un punto de despegue simulado al suroeste del área, para que la
+  distancia, el rumbo y "Navegar a" funcionen sin GPS. La brújula sí es la real del teléfono.
 
 Sirve para entrenar a operadores, probar la interfaz y presentar el proyecto sin hardware.
 Las coordenadas de la demo son un punto genérico en David, Chiriquí (Panamá), y se pueden
@@ -304,12 +329,12 @@ cambiar en `ReplaySource.kt`.
 | Permiso | Para qué |
 |---|---|
 | Bluetooth (conectar) | Hablar con la estación tierra. |
-| Ubicación | Mostrar la posición del operador en el mapa. Es opcional: si se niega, todo lo demás funciona. |
+| Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
 | Internet | Solo para descargar teselas del mapa cuando no hay `.mbtiles`. |
 | Vibración | Avisar de nuevas detecciones. |
 
 - **Todo se queda en el teléfono.** La app no tiene servidor, cuentas, analíticas ni
-  publicidad. Los datos solo salen si el operador exporta un GPX y lo comparte.
+  publicidad. Los datos solo salen si el operador exporta un GPX o comparte una detección.
 - **El payload no transmite imágenes de personas por LoRa**, solo coordenadas, confianza y hora.
 - **Decisión humana obligatoria.** La app nunca trata una detección como confirmada por sí
   sola. Cada confirmación o descarte guarda su hora para poder revisar la operación después.
@@ -324,6 +349,11 @@ cambiar en `ReplaySource.kt`.
   serie, lo que facilita depurar en campo. Caben igual en un envío de la E32.
 - **Interfaz oscura y de alto contraste:** se lee mejor al sol y gasta menos batería en
   pantallas OLED.
+- **La lista nunca se mueve bajo el dedo:** confirmar o descartar la tarjeta equivocada en una
+  búsqueda real es grave, así que se evita el desplazamiento automático y se bloquean los botones
+  un instante tras cada reordenamiento.
+- **Compartir como texto plano:** lo entiende cualquier persona en cualquier app, incluso sin
+  SAR-Response instalada.
 - **Mapa y video siempre montados:** al intercambiarlos solo cambia su tamaño, así el mapa no
   se recarga ni pierde el zoom.
 
@@ -334,19 +364,60 @@ cambiar en `ReplaySource.kt`.
   app se pierde. Exporta el GPX si necesitas conservarla.
 - La posición de una detección es la del GPS del **dron** en ese momento, no la proyección
   exacta del píxel al suelo. A 40–60 m de altura el error puede ser de varios metros.
+- La brújula del teléfono indica el norte **magnético**; la diferencia con el norte geográfico
+  es pequeña en Panamá (unos 2°), pero en otras regiones puede ser mayor. Además, las brújulas de
+  los teléfonos se descalibran cerca de metales: si la flecha no tiene sentido, haz un "8" con el
+  teléfono.
+- La distancia y el rumbo son en línea recta; no consideran el terreno ni los caminos.
 - La app asume una sola estación tierra a la vez.
 - Interfaz solo en español por ahora.
 
-## Hoja de ruta
+## Trabajo futuro
 
-- [ ] Video 5.8 GHz por receptor UVC (OTG).
-- [ ] Registro persistente de la misión (Room) y recuperación tras cierre.
-- [ ] Distancia y rumbo desde el operador hasta cada detección, y botón "navegar a".
-- [ ] Notas por detección (p. ej. "persona herida", "requiere camilla").
-- [ ] Proyección de la detección al suelo usando altura y orientación de la cámara.
-- [ ] Soporte para varios drones (`unidad`) con colores distintos.
+La app actual cubre el ciclo completo **detectar → verificar → decidir → guiar**. Lo que sigue
+está diseñado (parte de ello en un mockup interactivo), pero **todavía no se puede implementar**
+porque depende de hardware o radios que el prototipo no tiene. Se documenta aquí como la
+dirección del proyecto.
+
+### A corto plazo (solo software)
+
+- [ ] **Video 5.8 GHz** dentro de la app con el receptor UVC por OTG.
+- [ ] **Registro persistente de la misión** (Room) para que sobreviva si Android cierra la app.
+- [ ] **Búsquedas separadas:** cada misión con su nombre, su recorrido y sus detecciones;
+      "Nueva búsqueda" archiva la anterior y permite volver a revisarla.
+- [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
+- [ ] **Tema claro** como alternativa al oscuro.
+- [ ] Varios drones a la vez (campo `unidad`) con colores distintos.
 - [ ] Traducción al inglés.
-- [ ] App de escritorio con Kotlin Multiplatform reutilizando `core/`.
+- [ ] **App de escritorio** con Kotlin Multiplatform reutilizando `core/` y la estación tierra por USB.
+
+### Red de rescate en campo (requiere nuevo hardware)
+
+La idea es que el sistema no termine en el teléfono del operador, sino que llegue hasta quien
+camina hacia la víctima.
+
+- [ ] **SAR-Beacon, la vista del rescatista:** un nodo de mano (ESP32 + E32 + GPS + pantalla)
+      que muestra una flecha, la distancia y el rumbo hacia la detección que el operador le
+      asignó, con un botón **"Voy en camino"**.
+- [ ] **Enviar al equipo de tierra por radio:** desde una detección confirmada, el operador
+      asigna el objetivo a un rescatista concreto, sin depender de datos móviles.
+- [ ] **Nodos multi-rol:** el mismo firmware cumple distintos papeles según su identificador:
+      `A#` dron · `G#` tierra / rescatista · `R#` repetidor.
+- [ ] **Emparejamiento por QR** entre la app y cada nodo.
+- [ ] **Nuevos paquetes** en el mismo formato de texto con checksum:
+      - `$SAG` *go-to*: el operador asigna un objetivo a un rescatista.
+      - `$SGP` posición periódica del rescatista (aparece en el mapa del operador).
+      - `$SGA` confirmación (*ack*) de que el rescatista recibió la orden.
+- [ ] **Malla por inundación (*flooding*)** para cubrir quebradas y laderas sin línea de vista:
+      cada paquete lleva origen, secuencia y TTL; los nodos descartan duplicados y los
+      repetidores (`R#`) retransmiten.
+
+### Mejoras de precisión
+
+- [ ] Proyectar la detección al suelo usando la altura del dron y la orientación de la cámara,
+      en vez de usar la posición del dron.
+- [ ] Corregir la declinación magnética de la brújula.
+- [ ] Rutas a pie sobre el terreno (curvas de nivel, senderos) en vez de línea recta.
 
 ## Contribuir
 

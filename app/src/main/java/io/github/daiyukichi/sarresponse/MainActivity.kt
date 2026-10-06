@@ -5,6 +5,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -41,8 +42,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.daiyukichi.sarresponse.core.Alert
+import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.Geo
+import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.link.BluetoothSppSource
 import io.github.daiyukichi.sarresponse.ui.DashboardScreen
+import io.github.daiyukichi.sarresponse.ui.formatDistance
+import io.github.daiyukichi.sarresponse.ui.formatUtc
+import io.github.daiyukichi.sarresponse.ui.rememberDeviceHeading
+import io.github.daiyukichi.sarresponse.ui.rememberOperatorLocation
+import java.util.Locale
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -61,11 +73,22 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 val mission by vm.mission.collectAsStateWithLifecycle()
                 val link by vm.link.collectAsStateWithLifecycle()
+                val demoOperator by vm.demoOperator.collectAsStateWithLifecycle()
                 var showSources by remember { mutableStateOf(false) }
+                var permissionsAsked by remember { mutableStateOf(0) }
+                var toast by remember { mutableStateOf<String?>(null) }
 
                 val permissions = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),
-                ) { showSources = true }
+                ) {
+                    permissionsAsked++
+                    showSources = true
+                }
+
+                // En la demo el operador está en el punto de despegue simulado; en campo, el GPS del teléfono.
+                val phoneLocation by rememberOperatorLocation(permissionsAsked)
+                val operator = demoOperator ?: phoneLocation
+                val heading by rememberDeviceHeading()
 
                 val exportGpx = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/gpx+xml"),
@@ -75,13 +98,25 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this, "GPX exportado", Toast.LENGTH_SHORT).show()
                 }
 
-                LaunchedEffect(Unit) {
-                    vm.newAlerts.collect { notifyNewAlert() }
+                LaunchedEffect(operator) {
+                    vm.newAlerts.collect { alert ->
+                        notifyNewAlert()
+                        toast = alertSummary(alert, operator)
+                    }
+                }
+                LaunchedEffect(toast) {
+                    if (toast != null) {
+                        delay(3_500)
+                        toast = null
+                    }
                 }
 
                 DashboardScreen(
                     mission = mission,
                     link = link,
+                    operator = operator,
+                    heading = heading,
+                    toast = toast,
                     onSourceClick = {
                         val missing = requiredPermissions().filter {
                             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -89,6 +124,7 @@ class MainActivity : ComponentActivity() {
                         if (missing.isEmpty()) showSources = true else permissions.launch(missing.toTypedArray())
                     },
                     onDecide = vm::decide,
+                    onShare = { shareAlert(it, operator) },
                     onExportGpx = {
                         val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
                         exportGpx.launch("sar-$stamp.gpx")
@@ -114,6 +150,38 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         tone?.release()
         super.onDestroy()
+    }
+
+    /** Comparte por WhatsApp, SMS, correo, etc. un texto que se entiende sin la app. */
+    private fun shareAlert(alert: Alert, operator: GeoPoint?) {
+        val pos = alert.packet.position ?: return
+        val lat = String.format(Locale.ROOT, "%.6f", pos.lat)
+        val lon = String.format(Locale.ROOT, "%.6f", pos.lon)
+        val status = if (alert.status == AlertStatus.CONFIRMED) "CONFIRMADA por el operador" else "pendiente de revisión"
+        val fromOperator = operator?.let {
+            val b = Geo.bearingDegrees(it, pos)
+            "\nDesde el operador: ${formatDistance(Geo.distanceMeters(it, pos))} al ${Geo.compassPoint(b)} (${b.roundToInt()}°)"
+        } ?: ""
+        val text = "SAR-Response · Persona detectada #${alert.id} ($status)\n" +
+            "Confianza IA: ${(alert.packet.confidence * 100).roundToInt()}% · ${formatUtc(alert.packet.utc)} UTC\n" +
+            "Coordenadas: $lat, $lon$fromOperator\n" +
+            "Mapa: https://www.openstreetmap.org/?mlat=$lat&mlon=$lon#map=18/$lat/$lon\n" +
+            "geo:$lat,$lon"
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "SAR-Response · Detección #${alert.id}")
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        startActivity(Intent.createChooser(send, "Compartir coordenadas"))
+    }
+
+    private fun alertSummary(alert: Alert, operator: GeoPoint?): String {
+        val conf = (alert.packet.confidence * 100).roundToInt()
+        val pos = alert.packet.position
+        val where = if (pos != null && operator != null) {
+            " · ${formatDistance(Geo.distanceMeters(operator, pos))} ${Geo.compassPoint(Geo.bearingDegrees(operator, pos))}"
+        } else ""
+        return "Detección #${alert.id} · $conf%$where"
     }
 
     private fun requiredPermissions(): List<String> = buildList {

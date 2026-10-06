@@ -18,12 +18,17 @@ class ReplaySource(
 ) : LinkSource {
     override val label = "Demo (simulado)"
 
+    private val legs = 6
+    private val legLength = 300.0
+    private val spacing = 50.0
+
+    /** Punto de despegue simulado (donde está el operador), al suroeste del área barrida. */
+    val operatorPosition: GeoPoint =
+        Geo.offset(center, -legLength / 2 - 60, -(legs - 1) * spacing / 2 - 40)
+
     override fun lines(): Flow<String> = flow {
         var seq = 0
         var t = 12 * 3600 // 12:00:00 UTC simulado
-        val legs = 6
-        val legLength = 300.0
-        val spacing = 50.0
         val stepMeters = 25.0
         val start = Geo.offset(center, -legLength / 2, -(legs - 1) * spacing / 2)
         // Índices de paso donde "aparece" una persona, con su confianza.

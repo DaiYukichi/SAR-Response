@@ -2,7 +2,9 @@ package io.github.daiyukichi.sarresponse
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.GpxExporter
 import io.github.daiyukichi.sarresponse.core.LinkSource
 import io.github.daiyukichi.sarresponse.core.MissionTracker
@@ -35,19 +37,26 @@ class MissionViewModel : ViewModel() {
     private val _link = MutableStateFlow(LinkState())
     val link: StateFlow<LinkState> = _link.asStateFlow()
 
-    private val _newAlerts = MutableSharedFlow<Packet.Alert>(extraBufferCapacity = 8)
-    /** Una emisión por cada detección nueva (para sonar/vibrar). */
-    val newAlerts: SharedFlow<Packet.Alert> = _newAlerts
+    private val _newAlerts = MutableSharedFlow<Alert>(extraBufferCapacity = 8)
+    /** Una emisión por cada detección nueva (para avisar con sonido, vibración y mensaje). */
+    val newAlerts: SharedFlow<Alert> = _newAlerts
+
+    private val _demoOperator = MutableStateFlow<GeoPoint?>(null)
+    /** En la demo, la posición simulada del operador; null cuando se usa el GPS real del teléfono. */
+    val demoOperator: StateFlow<GeoPoint?> = _demoOperator.asStateFlow()
 
     private var linkJob: Job? = null
 
     fun startDemo() {
         tracker.reset()
-        connect(ReplaySource(), reconnect = false)
+        val demo = ReplaySource()
+        _demoOperator.value = demo.operatorPosition
+        connect(demo, reconnect = false)
     }
 
     /** [makeSource] recibe el callback que marca el enlace como conectado. */
     fun startBluetooth(makeSource: (onConnected: () -> Unit) -> LinkSource) {
+        _demoOperator.value = null
         connect(makeSource { _link.update { it.copy(status = LinkStatus.CONNECTED, error = null) } }, reconnect = true)
     }
 
@@ -73,7 +82,7 @@ class MissionViewModel : ViewModel() {
                         }
                         backoff = 1_000L
                         val p = tracker.onLine(line)
-                        if (p is Packet.Alert) _newAlerts.tryEmit(p)
+                        if (p is Packet.Alert) mission.value.alerts.lastOrNull()?.let { _newAlerts.tryEmit(it) }
                     }
                     _link.update { it.copy(error = if (reconnect) "Enlace cerrado" else null) }
                 } catch (e: CancellationException) {
