@@ -45,6 +45,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.CsvExporter
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.link.BluetoothSppSource
@@ -117,6 +118,16 @@ class MainActivity : ComponentActivity() {
                 val operator = demoOperator ?: phoneLocation
                 val heading by rememberDeviceHeading()
 
+                val exportCsv = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("text/csv"),
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    contentResolver.openOutputStream(uri)?.use {
+                        it.write(CsvExporter.detections(vm.mission.value, operator).toByteArray())
+                    }
+                    Toast.makeText(this, "CSV exportado", Toast.LENGTH_SHORT).show()
+                }
+
                 val exportGpx = rememberLauncherForActivityResult(
                     ActivityResultContracts.CreateDocument("application/gpx+xml"),
                 ) { uri ->
@@ -155,6 +166,10 @@ class MainActivity : ComponentActivity() {
                     onExportGpx = {
                         val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
                         exportGpx.launch("sar-$stamp.gpx")
+                    },
+                    onExportCsv = {
+                        val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm"))
+                        exportCsv.launch("sar-detecciones-$stamp.csv")
                     },
                 )
 

@@ -74,7 +74,8 @@ pensada para ese punto medio:
 | **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
-| **Exportar GPX** | Detecciones confirmadas y pendientes (las descartadas no) como waypoints, más el recorrido del dron. Se abre en OsmAnd, Google Earth, QGIS, Garmin, etc. |
+| **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
+| **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
 | **Mapa offline** | Mapa vectorial de OpenStreetMap (Chiriquí incluido, ~20 MB) con calles, lugares y nombres en español. Se puede importar el de otra zona. Nada se descarga en campo. |
 | **Arranque listo** | Al abrir, pide de una vez los permisos de ubicación y Bluetooth, y el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
@@ -140,6 +141,25 @@ entre el teléfono y la estación, o entre la estación y el dron.
   - Sin brújula, el rumbo se da respecto al norte, y el banner lo indica.
 - **Video**: imagen del VTX del payload (pendiente de integrar, ver [trabajo futuro](#trabajo-futuro)).
 - **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video.
+
+### Pestañas Operación / Panel
+
+Arriba a la izquierda. **Operación** es la vista de trabajo (mapa, video y detecciones).
+**Panel** muestra el resumen de la misión; el mapa sigue cargado debajo, así que al volver
+conserva el zoom y la posición.
+
+| Tarjeta del panel | Qué muestra y de dónde sale |
+|---|---|
+| Tiempo de misión / Distancia volada | Desde el primer paquete; suma del recorrido según el GPS del payload. |
+| Confirmadas / Paquetes perdidos | Confirmadas sobre el total; % perdido según los saltos de secuencia (verde < 5 %, ámbar < 15 %, rojo). |
+| Detecciones | Pendientes, confirmadas y descartadas, y el **tiempo promedio que tarda el operador en decidir**. |
+| Línea de tiempo | Cada detección según el momento en que llegó y su confianza (50–100 %), con el color de su estado. |
+| Calidad del enlace | Último paquete, **mayor silencio** y pérdida por tramo de la misión; un tramo gris punteado significa que no llegó nada. |
+| Equipo | Distancia del operador al dron y a cada detección activa. |
+| Registro de misión | Primer paquete, detecciones recibidas, decisiones (con cuánto tardaron) y silencios de más de 45 s. |
+
+El **% de área cubierta** y la **batería del payload** no se muestran todavía porque el protocolo
+no trae esos datos; están en [trabajo futuro](#trabajo-futuro).
 
 ### Panel de detecciones (abajo)
 
@@ -227,6 +247,7 @@ SAR-Response/
 │       ├── LinkSource.kt      Interfaz de cualquier origen de datos (Flow<String>)
 │       ├── ReplaySource.kt    Misión simulada para demos
 │       ├── GpxExporter.kt     Exportación GPX 1.1
+│       ├── MissionStats.kt    Indicadores del panel, registro de misión y exportación CSV
 │       └── Geo.kt             Distancia, rumbo, punto cardinal y desplazamientos
 ├── app/                       Aplicación Android (Jetpack Compose)
 │   └── src/main/java/.../sarresponse/
@@ -237,6 +258,7 @@ SAR-Response/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
 │           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
 │           ├── OfflineMap.kt  Archivo .pmtiles local, importación y estilo offline
+│           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista de video (marcador hasta integrar UVC)
 ├── app/src/main/assets/mapa/  Estilo, letras e íconos del mapa (y region.pmtiles, generado)
@@ -414,8 +436,13 @@ dirección del proyecto.
 
 - [ ] **Video 5.8 GHz** dentro de la app con el receptor UVC por OTG.
 - [ ] **Registro persistente de la misión** (Room) para que sobreviva si Android cierra la app.
-- [ ] **Búsquedas separadas:** cada misión con su nombre, su recorrido y sus detecciones;
+- [ ] **Búsquedas separadas y delimitadas:** cada misión con su nombre, su recorrido y sus
+      detecciones, y un **área dibujada sobre el mapa offline**; aviso si el dron sale de ella.
       "Nueva búsqueda" archiva la anterior y permite volver a revisarla.
+- [ ] **% del área cubierta** en el panel: requiere el área de búsqueda y agregar la altura del
+      dron al latido `$SAH` (para saber el ancho que ve la cámara).
+- [ ] **Batería del payload** en el panel: agregar el voltaje leído por el divisor en ADC0 al
+      latido `$SAH`.
 - [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
 - [ ] **Tema claro** como alternativa al oscuro.
 - [ ] Varios drones a la vez (campo `unidad`) con colores distintos.

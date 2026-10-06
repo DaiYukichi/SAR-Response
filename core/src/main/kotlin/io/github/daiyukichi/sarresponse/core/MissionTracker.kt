@@ -17,6 +17,9 @@ data class Alert(
 
 data class TrackPoint(val position: GeoPoint, val atMillis: Long)
 
+/** Llegada de un paquete válido; [lostBefore] = paquetes que faltaron justo antes (por seq). */
+data class PacketRecord(val atMillis: Long, val lostBefore: Int)
+
 data class MissionState(
     val alerts: List<Alert> = emptyList(),
     val track: List<TrackPoint> = emptyList(),
@@ -25,7 +28,9 @@ data class MissionState(
     val received: Int = 0,
     val lost: Int = 0,
     val corrupt: Int = 0,
+    val packets: List<PacketRecord> = emptyList(),
 ) {
+    val startedAtMillis: Long? get() = packets.firstOrNull()?.atMillis
     val dronePosition: GeoPoint? get() = track.lastOrNull()?.position
     val pendingCount: Int get() = alerts.count { it.status == AlertStatus.PENDING }
 }
@@ -66,11 +71,13 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
                     alerts = s.alerts + Alert(nextAlertId++, p, now),
                     track = track, lastPacketAtMillis = now,
                     received = s.received + 1, lost = s.lost + gap,
+                    packets = s.packets + PacketRecord(now, gap),
                 )
                 is Packet.Heartbeat -> s.copy(
                     lastHeartbeat = p,
                     track = track, lastPacketAtMillis = now,
                     received = s.received + 1, lost = s.lost + gap,
+                    packets = s.packets + PacketRecord(now, gap),
                 )
             }
         }

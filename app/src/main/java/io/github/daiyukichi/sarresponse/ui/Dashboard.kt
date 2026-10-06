@@ -31,6 +31,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -104,7 +106,9 @@ fun DashboardScreen(
     onDecide: (Long, AlertStatus) -> Unit,
     onShare: (Alert) -> Unit,
     onExportGpx: () -> Unit,
+    onExportCsv: () -> Unit,
 ) {
+    var showPanel by rememberSaveable { mutableStateOf(false) }
     var mapIsMain by rememberSaveable { mutableStateOf(true) }
     var selectedAlertId by rememberSaveable { mutableStateOf<Long?>(null) }
     var navTargetId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -120,73 +124,82 @@ fun DashboardScreen(
     LaunchedEffect(navTarget == null) { if (navTarget == null) navTargetId = null }
 
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
-        StatusHeader(mission, link, now, onSourceClick, onExportGpx)
+        StatusHeader(mission, link, now, showPanel, { showPanel = it }, onSourceClick, onExportGpx, onExportCsv)
 
-        Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
-            val main = Modifier.fillMaxSize()
-            val pip = pipModifier()
-            // Ambos paneles viven siempre en el mismo lugar del árbol: al intercambiarlos solo cambia
-            // su tamaño, así el mapa no se recrea ni pierde zoom/posición.
-            MapPane(
-                state = mission,
-                selectedAlertId = selectedAlertId,
-                operator = operator,
-                navTargetId = navTargetId,
-                pulse = (now / 1000) % 2 == 0L,
-                mapRevision = mapRevision,
-                onAlertClick = { selectedAlertId = it },
-                modifier = if (mapIsMain) main else pip,
-            )
-            VideoPane(compact = mapIsMain, modifier = if (mapIsMain) pip else main)
-            // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
-            Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
-
-            if (mapIsMain && navTarget == null) {
-                Legend(showOperator = operator != null, modifier = Modifier.align(Alignment.TopStart).padding(10.dp).zIndex(4f))
-            }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = toast != null,
-                enter = slideInVertically { -it } + fadeIn(),
-                exit = slideOutVertically { -it } + fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp).zIndex(6f),
-            ) {
-                Surface(color = Pending, shape = RoundedCornerShape(12.dp)) {
-                    Text(
-                        "⚠ ${toast.orEmpty()}",
-                        color = Color(0xFF2A1C00), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+        // El panel se dibuja ENCIMA de la vista de operación: así el mapa nunca se destruye
+        // y al volver conserva zoom y posición.
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
+                    val main = Modifier.fillMaxSize()
+                    val pip = pipModifier()
+                    // Ambos paneles viven siempre en el mismo lugar del árbol: al intercambiarlos solo cambia
+                    // su tamaño, así el mapa no se recrea ni pierde zoom/posición.
+                    MapPane(
+                        state = mission,
+                        selectedAlertId = selectedAlertId,
+                        operator = operator,
+                        navTargetId = navTargetId,
+                        pulse = (now / 1000) % 2 == 0L,
+                        mapRevision = mapRevision,
+                        onAlertClick = { selectedAlertId = it },
+                        modifier = if (mapIsMain) main else pip,
                     )
-                }
-            }
+                    VideoPane(compact = mapIsMain, modifier = if (mapIsMain) pip else main)
+                    // Capa transparente sobre el PiP: tocarlo intercambia las vistas.
+                    Box(pipModifier().zIndex(3f).clickable { mapIsMain = !mapIsMain })
 
-            if (navTarget != null) {
-                NavigationBanner(
-                    alert = navTarget,
+                    if (mapIsMain && navTarget == null) {
+                        Legend(showOperator = operator != null, modifier = Modifier.align(Alignment.TopStart).padding(10.dp).zIndex(4f))
+                    }
+
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = toast != null,
+                        enter = slideInVertically { -it } + fadeIn(),
+                        exit = slideOutVertically { -it } + fadeOut(),
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp).zIndex(6f),
+                    ) {
+                        Surface(color = Pending, shape = RoundedCornerShape(12.dp)) {
+                            Text(
+                                "⚠ ${toast.orEmpty()}",
+                                color = Color(0xFF2A1C00), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                            )
+                        }
+                    }
+
+                    if (navTarget != null) {
+                        NavigationBanner(
+                            alert = navTarget,
+                            operator = operator,
+                            heading = heading,
+                            onClose = { navTargetId = null },
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).zIndex(5f),
+                        )
+                    }
+                }
+
+                AlertPanel(
+                    mission = mission,
                     operator = operator,
-                    heading = heading,
-                    onClose = { navTargetId = null },
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).zIndex(5f),
+                    selectedId = selectedAlertId,
+                    onSelect = {
+                        selectedAlertId = it
+                        mapIsMain = true
+                    },
+                    onDecide = onDecide,
+                    onNavigate = {
+                        navTargetId = it
+                        selectedAlertId = it
+                        mapIsMain = true
+                    },
+                    onShare = onShare,
                 )
             }
+            if (showPanel) {
+                PanelScreen(mission, operator, now, Modifier.fillMaxSize().zIndex(10f))
+            }
         }
-
-        AlertPanel(
-            mission = mission,
-            operator = operator,
-            selectedId = selectedAlertId,
-            onSelect = {
-                selectedAlertId = it
-                mapIsMain = true
-            },
-            onDecide = onDecide,
-            onNavigate = {
-                navTargetId = it
-                selectedAlertId = it
-                mapIsMain = true
-            },
-            onShare = onShare,
-        )
     }
 }
 
@@ -206,16 +219,32 @@ private fun StatusHeader(
     mission: MissionState,
     link: LinkState,
     now: Long,
+    showPanel: Boolean,
+    onShowPanel: (Boolean) -> Unit,
     onSourceClick: () -> Unit,
     onExportGpx: () -> Unit,
+    onExportCsv: () -> Unit,
 ) {
+    var exportMenu by remember { mutableStateOf(false) }
     Surface(color = Surface1, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("SAR-Response", color = Ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Tabs(showPanel, onShowPanel)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onExportGpx, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text("Exportar GPX", color = Primary, fontSize = 12.sp)
+                Box {
+                    TextButton(onClick = { exportMenu = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text("Exportar", color = Primary, fontSize = 12.sp)
+                    }
+                    DropdownMenu(expanded = exportMenu, onDismissRequest = { exportMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text("GPX: detecciones y recorrido (mapas)") },
+                            onClick = { exportMenu = false; onExportGpx() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("CSV: detecciones y decisiones (informe)") },
+                            onClick = { exportMenu = false; onExportCsv() },
+                        )
+                    }
                 }
                 SourceChip(link, onSourceClick)
             }
@@ -245,6 +274,28 @@ private fun StatusHeader(
                 Counter(Warn, "Perdidos", mission.lost)
                 Counter(Danger, "Corruptos", mission.corrupt)
             }
+        }
+    }
+}
+
+/** Selector Operación / Panel. */
+@Composable
+private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
+    Row(
+        Modifier.clip(RoundedCornerShape(10.dp)).background(Bg).border(1.dp, Line, RoundedCornerShape(10.dp)).padding(3.dp),
+    ) {
+        listOf(false to "Operación", true to "Panel").forEach { (panel, label) ->
+            val active = showPanel == panel
+            Text(
+                label,
+                color = if (active) Color(0xFF001227) else Muted,
+                fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (active) Primary else Color.Transparent)
+                    .clickable { onShowPanel(panel) }
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+            )
         }
     }
 }
