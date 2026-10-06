@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="docs/img/logo-mono.svg#gh-light-mode-only" width="88" alt="">
+  <img src="docs/img/logo-mono-claro.svg#gh-dark-mode-only" width="88" alt="">
+</p>
+
 # SAR-Response
 
 **App Android de estación de tierra para drones de búsqueda y rescate (SAR) con IA a bordo.**
@@ -559,5 +564,7 @@ Código bajo licencia [Apache-2.0](LICENSE).
 - Video USB: [UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (Apache-2.0), que incluye
   libuvc (BSD), libusb (LGPL-2.1, enlazada dinámicamente) y libjpeg-turbo (BSD/IJG).
 - Letras Noto Sans: [SIL Open Font License](app/src/main/assets/mapa/licencias/fuentes-OFL.txt).
+- Ícono de la app, pantalla de arranque y logo: diseño "Baliza", "Radar" y "Monocromática"
+  generado con Dia para este proyecto.
 - Íconos del mapa: derivados de [tangrams/icons](https://github.com/tangrams/icons), licencia
   [MIT](app/src/main/assets/mapa/licencias/iconos-MIT.md).

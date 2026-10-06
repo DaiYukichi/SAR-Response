@@ -1,28 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pin de mapa (dónde) con una detección (punto ámbar) y ondas de radio (enlace LoRa). -->
+<!-- Baliza (diseño de Dia): pin de localización con pulso de señal. Las ondas van por fuera de la
+     cabeza del pin (en el diseño original quedaban tapadas). Coordenadas originales 512×512. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- ondas de señal -->
-    <path
-        android:pathData="M67,31a14,14 0,0 1,7 11"
-        android:strokeWidth="3.5"
-        android:strokeColor="#2DD4BF"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M70,23a23,23 0,0 1,12 19"
-        android:strokeWidth="3.5"
-        android:strokeColor="#2DD4BF"
-        android:strokeLineCap="round" />
-    <!-- pin con hueco -->
-    <path
-        android:fillColor="#4F9BFF"
-        android:fillType="evenOdd"
-        android:pathData="M51,27c-11.6,0 -21,9.4 -21,21c0,15.5 21,35 21,35s21,-19.5 21,-35c0,-11.6 -9.4,-21 -21,-21zM51,38.5a9.5,9.5 0,1 0,0 19a9.5,9.5 0,1 0,0 -19z" />
-    <!-- detección -->
-    <path
-        android:fillColor="#FBBF24"
-        android:pathData="M51,42a6,6 0,1 0,0 12a6,6 0,1 0,0 -12z" />
+    <group android:scaleX="0.135" android:scaleY="0.135" android:translateX="19.44" android:translateY="24.84">
+        <path android:pathData="M88.1,94.4A205,205 0,0 1,423.9,94.4" android:strokeColor="#FFFFFF" android:strokeWidth="18" android:strokeLineCap="round" android:strokeAlpha="0.55" />
+        <path android:pathData="M124.9,120.2A160,160 0,0 1,387.1,120.2" android:strokeColor="#FFFFFF" android:strokeWidth="18" android:strokeLineCap="round" android:strokeAlpha="0.85" />
+        <path android:pathData="M256,86C186,86 128,142 128,212C128,300 232,406 251,425a7,7 0,0 0,10 0C280,406 384,300 384,212C384,142 326,86 256,86ZM256,170a44,44 0,1 1,0 88a44,44 0,1 1,0 -88Z" android:fillColor="#FFFFFF" android:fillType="evenOdd" />
+    </group>
 </vector>
