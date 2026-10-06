@@ -26,12 +26,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -67,6 +69,7 @@ import io.github.daiyukichi.sarresponse.link.BluetoothSppSource
 import io.github.daiyukichi.sarresponse.ui.DashboardScreen
 import io.github.daiyukichi.sarresponse.ui.NewSearchDialog
 import io.github.daiyukichi.sarresponse.ui.OfflineMap
+import io.github.daiyukichi.sarresponse.ui.OnlineMap
 import io.github.daiyukichi.sarresponse.ui.SearchesDialog
 import io.github.daiyukichi.sarresponse.ui.formatDistance
 import io.github.daiyukichi.sarresponse.ui.formatUtc
@@ -118,6 +121,7 @@ class MainActivity : ComponentActivity() {
                 var toast by remember { mutableStateOf<String?>(null) }
                 var mapRevision by remember { mutableStateOf(0) }
                 var hasImportedMap by remember { mutableStateOf(OfflineMap.hasImported(this)) }
+                var onlineMapEnabled by remember { mutableStateOf(OnlineMap.isEnabled(this)) }
                 val scope = rememberCoroutineScope()
 
                 val permissions = rememberLauncherForActivityResult(
@@ -208,6 +212,7 @@ class MainActivity : ComponentActivity() {
                         heading = heading,
                         toast = toast,
                         mapRevision = mapRevision,
+                        onlineMapEnabled = onlineMapEnabled,
                         video = video,
                         onSourceClick = {
                             val missing = missingPermissions()
@@ -289,6 +294,11 @@ class MainActivity : ComponentActivity() {
                         onStop = { vm.stop(); showSources = false },
                         onDismiss = { showSources = false },
                         hasImportedMap = hasImportedMap,
+                        onlineMapEnabled = onlineMapEnabled,
+                        onToggleOnlineMap = {
+                            onlineMapEnabled = !onlineMapEnabled
+                            OnlineMap.setEnabled(this@MainActivity, onlineMapEnabled)
+                        },
                         onDownloadMap = {
                             showSources = false
                             pickingMapArea = true
@@ -393,6 +403,8 @@ private fun SourceDialog(
     onStop: () -> Unit,
     onDismiss: () -> Unit,
     hasImportedMap: Boolean,
+    onlineMapEnabled: Boolean,
+    onToggleOnlineMap: () -> Unit,
     onDownloadMap: () -> Unit,
     onImportMap: () -> Unit,
     onRemoveImportedMap: () -> Unit,
@@ -422,9 +434,22 @@ private fun SourceDialog(
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onDemo).padding(vertical = 10.dp),
                 )
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                Text("Mapa offline:", style = MaterialTheme.typography.labelLarge)
+                Text("Mapa:", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    Modifier.fillMaxWidth().clickable(onClick = onToggleOnlineMap).padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Mapa en línea cuando haya internet")
+                        Text(
+                            "Mundo entero con detalle. Sin internet se usa el offline.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(checked = onlineMapEnabled, onCheckedChange = { onToggleOnlineMap() })
+                }
                 Text(
-                    if (hasImportedMap) "Usando un mapa descargado o importado." else "Usando el mapa incluido (mundo general + Chiriquí).",
+                    "Offline: " + if (hasImportedMap) "mapa descargado o importado." else "mapa incluido (mundo general + Chiriquí).",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp),
                 )

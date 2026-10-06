@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -76,6 +77,8 @@ fun MapPane(
     pulse: Boolean,
     mapRevision: Int,
     onAlertClick: (Long) -> Unit,
+    /** Usar el mapa en línea cuando haya internet (si no hay, se usa el offline). */
+    onlineEnabled: Boolean = true,
     modifier: Modifier = Modifier,
     area: SearchArea? = null,
     /** Vértices del área que se está dibujando; si no es null, tocar el mapa agrega un vértice. */
@@ -87,14 +90,28 @@ fun MapPane(
     val context = LocalContext.current
     var hasBaseMap by remember { mutableStateOf(true) }
     var style by remember { mutableStateOf<String?>(null) }
+    var usingOnline by remember { mutableStateOf(false) }
+    val online by rememberIsOnline()
 
-    // Copiar el mapa a disco (19 MB la primera vez) y leer el estilo es E/S: fuera del hilo principal.
-    LaunchedEffect(mapRevision) {
-        style = withContext(Dispatchers.IO) {
-            val file = OfflineMap.file(context)
-            hasBaseMap = file != null
-            OfflineMap.styleJson(context, file)
+    // Con internet (y la opción activa) se usa el mapa en línea; si no, o si no responde, el offline.
+    // Copiar el mapa offline a disco (34 MB la primera vez) y buscar el en línea es E/S: fuera del hilo principal.
+    LaunchedEffect(mapRevision, online, onlineEnabled) {
+        val json = withContext(Dispatchers.IO) {
+            val url = if (online && onlineEnabled) OnlineMap.baseUrl(context) else null
+            usingOnline = url != null
+            if (url != null) {
+                hasBaseMap = true
+                OfflineMap.styleFor(context, "pmtiles://$url")
+            } else {
+                val file = OfflineMap.file(context)
+                hasBaseMap = file != null
+                OfflineMap.styleJson(context, file)
+            }
         }
+        // MapLibre debe estar inicializado antes de decirle si puede usar la red.
+        MapLibre.getInstance(context)
+        MapLibre.setConnected(usingOnline)
+        style = json
     }
 
     // El MapView se crea recién cuando el estilo está listo: si se crea antes y el estilo llega
@@ -141,6 +158,16 @@ fun MapPane(
 
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { holder.map }, update = { holder.render(state, selectedAlertId, operator, navTargetId, pulse, area, draft) })
+        Text(
+            if (usingOnline) "● En línea" else "● Offline",
+            color = if (usingOnline) Color(0xFF34D399) else Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.55f))
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+        )
         Text(
             "© OpenStreetMap · Protomaps",
             color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp,
@@ -193,9 +220,8 @@ private class MapHolder(context: Context) {
     )
 
     init {
+        // Si puede usar la red (mapa en línea) o no, lo decide MapPane antes de crear el mapa.
         MapLibre.getInstance(context)
-        // La app no usa la red: se le dice a MapLibre que está desconectada para que no intente nada.
-        MapLibre.setConnected(false)
         val options = MapLibreMapOptions.createFromAttributes(context)
             // TextureView en vez de SurfaceView: así el mapa respeta recortes, bordes redondeados
             // y el orden de dibujo cuando está en la miniatura (PiP).

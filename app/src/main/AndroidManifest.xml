@@ -10,12 +10,12 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!--
-      La app funciona sin internet: el mapa es un archivo local y MapLibre queda en modo desconectado.
-      INTERNET se usa SOLO para "Descargar mapa de una zona", cuando el operador lo pide antes de salir.
-      Los permisos de estado de red que agrega MapLibre no hacen falta y se quitan.
+      La app funciona sin internet: siempre hay un mapa offline en el teléfono. Con internet se usa
+      solo para el mapa en línea (opcional, se puede apagar) y para "Descargar mapa de una zona".
+      ACCESS_NETWORK_STATE permite saber si hay conexión para elegir entre en línea y offline.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" tools:node="remove" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Android exige el permiso de cámara para abrir una cámara USB (el receptor de video 5.8 GHz es UVC). -->

@@ -74,10 +74,13 @@ object OfflineMap {
     fun hasImported(context: Context) = imported(context) != null
 
     /** Estilo MapLibre: el mapa base si hay archivo; si no, solo un fondo liso. */
-    fun styleJson(context: Context, map: File?): String {
-        if (map == null) return EMPTY_STYLE
+    fun styleJson(context: Context, map: File?): String =
+        if (map == null) EMPTY_STYLE else styleFor(context, "pmtiles://file://${map.absolutePath}")
+
+    /** Mismo estilo (oscuro, en español) para cualquier origen PMTiles: archivo local o URL en línea. */
+    fun styleFor(context: Context, pmtilesUrl: String): String {
         val template = context.assets.open(STYLE_ASSET).bufferedReader().use { it.readText() }
-        return template.replace("{{PMTILES_URL}}", "pmtiles://file://${map.absolutePath}")
+        return template.replace("{{PMTILES_URL}}", pmtilesUrl)
     }
 
     private const val EMPTY_STYLE =

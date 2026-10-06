@@ -56,8 +56,8 @@ pensada para ese punto medio:
 - **La IA propone, la persona decide.** Cada detección llega como *pendiente* y el operador
   la confirma o la descarta mirando el video y el contexto.
 - **Funciona sin internet.** Zonas de desastre, montaña o selva rara vez tienen datos móviles.
-  El enlace es LoRa + Bluetooth y el mapa va dentro de la app. Internet solo se usa, si el
-  operador lo pide, para **descargar el mapa de otra zona antes de salir**.
+  El enlace es LoRa + Bluetooth y siempre hay un mapa offline en el teléfono. Si hay internet,
+  el mapa se carga **en línea** (mundo entero con detalle); si se corta, la app pasa sola al offline.
 - **Hardware barato y común.** Un teléfono Android, un ESP32, un módulo LoRa E32 y un
   receptor de video FPV de los que se usan en drones de carreras.
 
@@ -78,6 +78,7 @@ pensada para ese punto medio:
 | **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
+| **Mapa en línea u offline** | Con internet, el mapa del mundo entero con detalle de calle se carga en línea (indicador **● En línea**). Sin internet, o si se corta, cambia solo al mapa del teléfono (**● Offline**). Se puede apagar el modo en línea en **Elegir fuente**. |
 | **Mapa offline** | Mapa vectorial de OpenStreetMap con calles, lugares y nombres en español. Incluido: **mundo con poco detalle + Chiriquí con detalle de calle** (~34 MB). **Descargar mapa de una zona** desde la app (encuadras la zona y listo) o importar un `.pmtiles`. En campo no se descarga nada. |
 | **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
@@ -290,7 +291,8 @@ SAR-Response/
 │       └── ui/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
 │           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
-│           ├── OfflineMap.kt  Archivo .pmtiles local, importación/descarga y estilo offline
+│           ├── OfflineMap.kt  Archivo .pmtiles local, importación/descarga y estilo
+│           ├── OnlineMap.kt   Mapa en línea y detección de conexión (cambio automático)
 │           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
 │           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
@@ -362,9 +364,15 @@ también por USB para depurar.
 
 ## Mapas sin internet
 
-El mapa es **vectorial y local**: un archivo `.pmtiles` con datos de OpenStreetMap (vía
-[Protomaps](https://protomaps.com)), dibujado con [MapLibre](https://maplibre.org) en modo
-desconectado. Las letras y los íconos del mapa también van dentro de la app.
+El mapa es **vectorial**: datos de OpenStreetMap (vía [Protomaps](https://protomaps.com)) en
+formato `.pmtiles`, dibujados con [MapLibre](https://maplibre.org) con el mismo estilo oscuro en
+español, sea en línea u offline. Las letras y los íconos del mapa van dentro de la app.
+
+- **En línea (si hay internet y la opción está activa):** se lee el mapa base mundial directamente
+  de internet, pidiendo solo las teselas que se ven. La app vigila la conexión: si se pierde, pasa
+  al mapa offline; si vuelve, regresa al en línea. Abajo a la derecha del mapa se indica cuál se usa.
+- **Offline:** el mapa guardado en el teléfono. Fuera de la zona con detalle solo existe el mundo
+  general: si el mapa se ve vacío, alejarlo (o descargar esa zona antes de salir).
 
 - **Incluido:** el **mundo con poco detalle** (países, ciudades, carreteras principales; ~15 MB)
   para ubicarse en cualquier parte, más **Chiriquí con detalle de calle** (~19 MB). Al primer
@@ -423,12 +431,13 @@ cambiar en `ReplaySource.kt`.
 |---|---|
 | Bluetooth (conectar) | Hablar con la estación tierra. |
 | Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
-| Internet | **Solo** para "Descargar mapa de una zona", cuando el operador lo pide. Nada más en la app usa la red: el mapa funciona en modo desconectado y no hay servidores, cuentas ni analíticas. |
+| Internet / estado de red | **Solo** para el mapa: verlo en línea cuando hay conexión (se puede apagar) y "Descargar mapa de una zona". Nada más usa la red: los datos del dron, las detecciones y las decisiones nunca salen del teléfono, y no hay servidores, cuentas ni analíticas. |
 | Cámara | **Solo** para leer el receptor de video USB: Android exige este permiso para abrir cualquier cámara USB. La app no usa las cámaras del teléfono. |
 | Vibración | Avisar de nuevas detecciones. |
 
-- **Sin internet en campo, por diseño.** Ninguna función de la operación usa la red. El permiso de
-  internet existe solo para descargar mapas antes de salir, a pedido del operador.
+- **Sin internet en campo, por diseño.** Ninguna función de la operación depende de la red. Internet
+  solo se usa para mostrar o descargar el **mapa**; las detecciones y las posiciones no se envían a
+  ningún lado.
 - **Todo se queda en el teléfono.** La app no tiene servidor, cuentas, analíticas ni
   publicidad. Los datos solo salen si el operador exporta un GPX o comparte una detección.
 - **El payload no transmite imágenes de personas por LoRa**, solo coordenadas, confianza y hora.
