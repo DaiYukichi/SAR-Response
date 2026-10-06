@@ -11,8 +11,12 @@ import kotlin.math.tan
 object CameraGeometry {
     const val MODEL_INPUT_PX = 640
 
-    /** FOV horizontal provisional hasta medir el de la cámara real (pared a distancia conocida). */
-    const val DEFAULT_HFOV_DEGREES = 70.0
+    /**
+     * FOV horizontal por defecto: cámara Raspberry Pi v1.3 (OV5647, módulo "P5V04A SUNNY") en modo
+     * 1920×1080, que recorta el centro del sensor: 53,5° del sensor completo × 1920/2592 ≈ 41°.
+     * En un modo 4:3 con el sensor completo sería 53,5°. Confirmar midiendo contra una pared.
+     */
+    const val DEFAULT_HFOV_DEGREES = 41.0
 
     /** Por debajo de esto la detección cae: el modelo se entrenó con personas de ~13×16 px. */
     const val MIN_PERSON_PX = 12.0

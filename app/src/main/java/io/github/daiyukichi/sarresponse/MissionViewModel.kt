@@ -14,7 +14,11 @@ import io.github.daiyukichi.sarresponse.core.Packet
 import io.github.daiyukichi.sarresponse.core.ReplaySource
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.core.SearchArea
+import io.github.daiyukichi.sarresponse.core.map.HttpRangeSource
+import io.github.daiyukichi.sarresponse.core.map.MapExtractor
+import io.github.daiyukichi.sarresponse.core.map.MapRegion
 import io.github.daiyukichi.sarresponse.data.SearchStore
+import io.github.daiyukichi.sarresponse.ui.OfflineMap
 import io.github.daiyukichi.sarresponse.data.SearchSummary
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -37,6 +41,14 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class LinkStatus { IDLE, CONNECTING, CONNECTED, RETRYING }
+
+/** Descarga de un mapa offline en curso (o su resultado). */
+data class MapDownload(
+    val stage: String,
+    val fraction: Float? = null,
+    val error: String? = null,
+    val finished: Boolean = false,
+)
 
 data class LinkState(
     val label: String? = null,
@@ -70,6 +82,55 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
     val demoOperator: StateFlow<GeoPoint?> = _demoOperator.asStateFlow()
 
     private var linkJob: Job? = null
+
+    private val _mapDownload = MutableStateFlow<MapDownload?>(null)
+    val mapDownload: StateFlow<MapDownload?> = _mapDownload.asStateFlow()
+    private var mapJob: Job? = null
+
+    /**
+     * Baja el mundo general + el detalle de [region] desde el mapa base público de Protomaps y lo deja
+     * como mapa offline activo. Es lo ÚNICO de la app que usa internet, y solo cuando el operador lo pide.
+     */
+    fun downloadMap(region: MapRegion, onReady: () -> Unit) {
+        if (mapJob?.isActive == true) return
+        val context = getApplication<Application>()
+        mapJob = viewModelScope.launch {
+            _mapDownload.value = MapDownload("Buscando el mapa base…")
+            val target = OfflineMap.newTarget(context)
+            try {
+                val job = coroutineContext[Job]
+                withContext(Dispatchers.IO) {
+                    val url = MapExtractor.latestProtomapsBuild()
+                    MapExtractor(
+                        HttpRangeSource(url),
+                        onProgress = { p ->
+                            _mapDownload.value = MapDownload(p.stage, if (p.total > 0) p.done.toFloat() / p.total else null)
+                        },
+                        isCancelled = { job?.isActive != true },
+                    ).extract(listOf(MapRegion.WORLD_OVERVIEW, region), target)
+                    OfflineMap.commit(context, target)
+                }
+                _mapDownload.value = MapDownload("Mapa descargado", 1f, finished = true)
+                onReady()
+            } catch (e: CancellationException) {
+                target.delete()
+                _mapDownload.value = null
+                throw e
+            } catch (e: Exception) {
+                target.delete()
+                _mapDownload.value = MapDownload("Error", error = e.message ?: e.javaClass.simpleName)
+            }
+        }
+    }
+
+    fun cancelMapDownload() {
+        mapJob?.cancel()
+        _mapDownload.value = null
+    }
+
+    fun dismissMapDownload() {
+        _mapDownload.value = null
+    }
 
     init {
         viewModelScope.launch {

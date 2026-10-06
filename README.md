@@ -54,9 +54,9 @@ pensada para ese punto medio:
 
 - **La IA propone, la persona decide.** Cada detección llega como *pendiente* y el operador
   la confirma o la descarta mirando el video y el contexto.
-- **Funciona 100 % sin internet.** Zonas de desastre, montaña o selva rara vez tienen datos
-  móviles. El enlace es LoRa + Bluetooth y el mapa va dentro de la app. **La app ni siquiera
-  tiene permiso de internet**: es imposible que dependa de la red.
+- **Funciona sin internet.** Zonas de desastre, montaña o selva rara vez tienen datos móviles.
+  El enlace es LoRa + Bluetooth y el mapa va dentro de la app. Internet solo se usa, si el
+  operador lo pide, para **descargar el mapa de otra zona antes de salir**.
 - **Hardware barato y común.** Un teléfono Android, un ESP32, un módulo LoRa E32 y un
   receptor de video FPV de los que se usan en drones de carreras.
 
@@ -77,7 +77,7 @@ pensada para ese punto medio:
 | **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
-| **Mapa offline** | Mapa vectorial de OpenStreetMap (Chiriquí incluido, ~20 MB) con calles, lugares y nombres en español. Se puede importar el de otra zona. Nada se descarga en campo. |
+| **Mapa offline** | Mapa vectorial de OpenStreetMap con calles, lugares y nombres en español. Incluido: **mundo con poco detalle + Chiriquí con detalle de calle** (~34 MB). **Descargar mapa de una zona** desde la app (encuadras la zona y listo) o importar un `.pmtiles`. En campo no se descarga nada. |
 | **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
 | **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
@@ -85,7 +85,8 @@ pensada para ese punto medio:
 ## Cómo se usa en campo
 
 1. **Antes de salir**
-   - Si la búsqueda es fuera de Chiriquí, importa el mapa de esa zona ([ver abajo](#mapas-sin-internet)).
+   - Si la búsqueda es fuera de Chiriquí, con internet: **Elegir fuente → Descargar mapa de una
+     zona**, encuadra la zona en el mapa y **Descargar esta zona** ([ver abajo](#mapas-sin-internet)).
    - Abre la app con cielo despejado unos minutos antes: sin internet, el primer fix del GPS
      del teléfono puede tardar de 30 s a unos minutos.
    - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
@@ -182,9 +183,10 @@ altura constante.
 **Altura, barrido y tamaño de la persona.** Con la cámara hacia abajo, el ancho de terreno visto es
 `2 × altura × tan(FOV/2)`. El modelo recibe la imagen reducida a 640 px de ancho, así que una persona
 de tamaño `s` ocupa `s × 640 / barrido` píxeles. El modelo se entrenó con personas de unos 13×16 px;
-por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV es provisional (70°)** hasta
-medir la cámara del payload: a 2 m de una pared, medir el ancho `W` visible y usar
-`FOV = 2·atan(W/4)`. La **batería del payload** no se muestra todavía porque el protocolo no la trae
+por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV por defecto es 41°**: la cámara
+del payload es la Raspberry Pi v1.3 (OV5647, módulo P5V04A) y en modo 1920×1080 recorta el centro
+del sensor (53,5° del sensor completo × 1920/2592 ≈ 41°). Para confirmarlo: a 2 m de una pared,
+medir el ancho `W` visible y usar `FOV = 2·atan(W/4)`. La **batería del payload** no se muestra todavía porque el protocolo no la trae
 ([trabajo futuro](#trabajo-futuro)).
 
 ### Panel de detecciones (abajo)
@@ -275,6 +277,8 @@ SAR-Response/
 │       ├── GpxExporter.kt     Exportación GPX 1.1
 │       ├── MissionStats.kt    Indicadores del panel, registro de misión y exportación CSV
 │       ├── SearchArea.kt      Búsqueda y su área: superficie, contiene/no contiene, cobertura
+│       ├── CameraGeometry.kt  Altura → ancho de barrido → píxeles de una persona
+│       └── map/               PMTiles: formato, recortador por zonas y CLI para el mapa incluido
 │       └── Geo.kt             Distancia, rumbo, punto cardinal y desplazamientos
 ├── app/                       Aplicación Android (Jetpack Compose)
 │   └── src/main/java/.../sarresponse/
@@ -285,7 +289,7 @@ SAR-Response/
 │       └── ui/
 │           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
 │           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
-│           ├── OfflineMap.kt  Archivo .pmtiles local, importación y estilo offline
+│           ├── OfflineMap.kt  Archivo .pmtiles local, importación/descarga y estilo offline
 │           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
 │           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
@@ -318,10 +322,10 @@ interface LinkSource {
 
 ## Compilar e instalar
 
-Requisitos: Android Studio reciente (con AGP 9) y JDK 17 o superior. El mapa no se sube al
+Requisitos: Android Studio reciente (con AGP 9) y JDK 17 o superior. El mapa incluido no se sube al
 repositorio por su tamaño: genéralo una vez con `tools/mapa/descargar_mapa.sh` (ver
-[Mapas sin internet](#mapas-sin-internet)). Si no lo generas, la app compila igual y funciona
-sin mapa base.
+[Mapas sin internet](#mapas-sin-internet)). Si no lo generas, la app compila igual: arranca sin
+mapa base y puedes descargar uno desde la propia app.
 
 ```bash
 git clone https://github.com/DaiYukichi/SAR-Response.git
@@ -358,34 +362,44 @@ también por USB para depurar.
 ## Mapas sin internet
 
 El mapa es **vectorial y local**: un archivo `.pmtiles` con datos de OpenStreetMap (vía
-[Protomaps](https://protomaps.com)), dibujado con [MapLibre](https://maplibre.org). Las letras y
-los íconos del mapa también van dentro de la app, así que **nada se descarga nunca**.
+[Protomaps](https://protomaps.com)), dibujado con [MapLibre](https://maplibre.org) en modo
+desconectado. Las letras y los íconos del mapa también van dentro de la app.
 
-- **Incluido:** Chiriquí completo (~20 MB, detalle hasta nivel de calle). Al primer arranque se
-  copia al almacenamiento interno; por eso la primera vez el mapa puede tardar unos segundos.
-- **Otra zona:** en **Elegir fuente → Importar mapa (.pmtiles)…** eliges un archivo que ya esté
-  en el teléfono (Descargas, memoria USB, etc.). **Volver al mapa incluido** lo deshace.
+- **Incluido:** el **mundo con poco detalle** (países, ciudades, carreteras principales; ~15 MB)
+  para ubicarse en cualquier parte, más **Chiriquí con detalle de calle** (~19 MB). Al primer
+  arranque se copia al almacenamiento interno; por eso la primera vez tarda unos segundos.
+- **Descargar otra zona desde la app (plug and play):** con internet, antes de salir,
+  **Elegir fuente → Descargar mapa de una zona (requiere internet)**. Mueves y acercas el mapa
+  hasta encuadrar la zona y tocas **Descargar esta zona**: la app baja **solo esa zona** con detalle
+  de calle (más el mundo general), con progreso y opción de cancelar. Si la zona es muy grande,
+  baja automáticamente el nivel de detalle para no pasar de ~90 MB.
+- **Importar:** **Importar mapa (.pmtiles)…** carga un archivo que ya esté en el teléfono.
+  **Volver al mapa incluido** deshace la descarga o importación.
 - **Sin ningún mapa:** la app sigue funcionando; recorrido, pines, distancias y navegación se
   dibujan sobre un fondo liso.
 
-### Generar el mapa de una zona (en la computadora, con internet)
+### Cómo funciona la descarga
 
-Necesitas la herramienta [`pmtiles`](https://github.com/protomaps/go-pmtiles/releases).
+El mapa base diario de Protomaps es un único archivo PMTiles del planeta (~120 GB). La app no lo
+baja: lee su índice y pide por HTTP (`Range`) **solo los bytes de las teselas de la zona**, y arma
+con ellas un PMTiles nuevo y válido (`core/map/MapExtractor.kt`). Es el mismo resultado que
+`pmtiles extract`, verificado con `pmtiles verify` y con una prueba que compara tesela por tesela.
 
-```bash
-tools/mapa/descargar_mapa.sh                              # Chiriquí (por defecto)
-tools/mapa/descargar_mapa.sh "-82.52,8.36,-82.35,8.50"    # otra zona: oeste,sur,este,norte
-```
-
-El script recorta solo la zona pedida del mapa mundial diario de Protomaps y la deja en
-`app/src/main/assets/mapa/region.pmtiles`, que se empaqueta al compilar. Para usarlo como mapa
-importado en vez de compilarlo, copia ese archivo al teléfono e impórtalo desde la app.
-
+> Se usan las builds públicas de `build.protomaps.com` (se guardan las de la última semana). Para
+> uso en producción conviene alojar una copia propia del mapa base y cambiar la URL.
 > No se usan los servidores de teselas de OpenStreetMap: su
 > [política](https://operations.osmfoundation.org/policies/tiles/) prohíbe las descargas masivas.
 
-El estilo del mapa (tema oscuro, etiquetas en español) se genera con
-`cd tools/mapa && npm install && npm run estilo`.
+### Generar el mapa incluido (en la computadora)
+
+```bash
+tools/mapa/descargar_mapa.sh                              # mundo + Chiriquí (por defecto)
+tools/mapa/descargar_mapa.sh "-82.52,8.36,-82.35,8.50"    # mundo + otra zona: oeste,sur,este,norte
+```
+
+Usa el mismo recortador de la app (no requiere herramientas externas) y deja el resultado en
+`app/src/main/assets/mapa/region.pmtiles`, que se empaqueta al compilar. El estilo del mapa (tema
+oscuro, etiquetas en español) se genera con `cd tools/mapa && npm install && npm run estilo`.
 
 ## Modo demo
 
@@ -408,11 +422,12 @@ cambiar en `ReplaySource.kt`.
 |---|---|
 | Bluetooth (conectar) | Hablar con la estación tierra. |
 | Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
+| Internet | **Solo** para "Descargar mapa de una zona", cuando el operador lo pide. Nada más en la app usa la red: el mapa funciona en modo desconectado y no hay servidores, cuentas ni analíticas. |
 | Cámara | **Solo** para leer el receptor de video USB: Android exige este permiso para abrir cualquier cámara USB. La app no usa las cámaras del teléfono. |
 | Vibración | Avisar de nuevas detecciones. |
 
-- **Sin internet, por diseño.** El manifiesto elimina los permisos de red (incluidos los que
-  agrega la librería del mapa), así que Android no deja que la app use la red.
+- **Sin internet en campo, por diseño.** Ninguna función de la operación usa la red. El permiso de
+  internet existe solo para descargar mapas antes de salir, a pedido del operador.
 - **Todo se queda en el teléfono.** La app no tiene servidor, cuentas, analíticas ni
   publicidad. Los datos solo salen si el operador exporta un GPX o comparte una detección.
 - **El payload no transmite imágenes de personas por LoRa**, solo coordenadas, confianza y hora.
@@ -434,6 +449,9 @@ cambiar en `ReplaySource.kt`.
   un instante tras cada reordenamiento.
 - **Compartir como texto plano:** lo entiende cualquier persona en cualquier app, incluso sin
   SAR-Response instalada.
+- **Recortar el mapa nosotros mismos:** descargar solo los bytes de la zona (en vez de un
+  archivo por país preparado de antemano) permite bajar *cualquier* zona del mundo sin servidor
+  propio, y unir "mundo general + detalle" en un solo archivo.
 - **Mapa vectorial en vez de imágenes:** Chiriquí entero pesa ~20 MB, se ve nítido a cualquier
   zoom y los nombres se pueden mostrar en español.
 - **Mapa y video siempre montados:** al intercambiarlos solo cambia su tamaño, así el mapa no
@@ -472,7 +490,10 @@ dirección del proyecto.
 - [ ] Grabar el video de la misión junto con las detecciones.
 - [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
 - [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
-- [ ] **Medir el FOV real** de la cámara del payload (hoy 70° provisional).
+- [ ] **Medir el FOV real** de la cámara del payload (hoy 41°, calculado del modo 1080p de la OV5647).
+- [ ] Usar un modo 4:3 con el sensor completo (≈53,5° × 41,4°): aprovecha 75 % de la entrada de
+      640×640 del modelo en vez de 56 % y cubre más terreno por pasada.
+- [ ] Alojar una copia propia del mapa base para las descargas, en vez de las builds públicas.
 - [ ] **Altura real en vuelo:** agregar la altura relativa al despegue al latido `$SAH` (GPS o
       barómetro) para que la cobertura use la altura medida y no la planificada.
 - [ ] **Recall según tamaño en píxeles** a partir de la evaluación del modelo en la K230, para que

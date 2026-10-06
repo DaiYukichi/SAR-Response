@@ -108,6 +108,8 @@ class MainActivity : ComponentActivity() {
                 var draftAltitude by remember { mutableStateOf(Search.DEFAULT_ALTITUDE_METERS) }
                 var draftFov by remember { mutableStateOf(CameraGeometry.DEFAULT_HFOV_DEGREES) }
                 var draft by remember { mutableStateOf<List<GeoPoint>?>(null) }
+                var pickingMapArea by remember { mutableStateOf(false) }
+                val mapDownload by vm.mapDownload.collectAsStateWithLifecycle()
                 var showSources by remember { mutableStateOf(false) }
                 var permissionsAsked by remember { mutableStateOf(0) }
                 // El mapa se crea recién después de resolver los permisos: si el aviso de permisos
@@ -224,6 +226,18 @@ class MainActivity : ComponentActivity() {
                             draft?.takeIf { it.size >= 3 }?.let { vm.createSearch(draftName, SearchArea(it), draftAltitude, draftFov) }
                             draft = null
                         },
+                        pickingMapArea = pickingMapArea,
+                        mapDownload = mapDownload,
+                        onMapAreaCancel = { pickingMapArea = false },
+                        onMapAreaConfirm = { region ->
+                            pickingMapArea = false
+                            vm.downloadMap(region) {
+                                hasImportedMap = true
+                                mapRevision++
+                            }
+                        },
+                        onMapDownloadCancel = vm::cancelMapDownload,
+                        onMapDownloadDismiss = vm::dismissMapDownload,
                     )
                 }
 
@@ -275,6 +289,10 @@ class MainActivity : ComponentActivity() {
                         onStop = { vm.stop(); showSources = false },
                         onDismiss = { showSources = false },
                         hasImportedMap = hasImportedMap,
+                        onDownloadMap = {
+                            showSources = false
+                            pickingMapArea = true
+                        },
                         onImportMap = {
                             showSources = false
                             importMap.launch(arrayOf("*/*"))
@@ -375,6 +393,7 @@ private fun SourceDialog(
     onStop: () -> Unit,
     onDismiss: () -> Unit,
     hasImportedMap: Boolean,
+    onDownloadMap: () -> Unit,
     onImportMap: () -> Unit,
     onRemoveImportedMap: () -> Unit,
 ) {
@@ -405,9 +424,13 @@ private fun SourceDialog(
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text("Mapa offline:", style = MaterialTheme.typography.labelLarge)
                 Text(
-                    if (hasImportedMap) "Usando un mapa importado." else "Usando el mapa incluido (Chiriquí).",
+                    if (hasImportedMap) "Usando un mapa descargado o importado." else "Usando el mapa incluido (mundo general + Chiriquí).",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "Descargar mapa de una zona (requiere internet)…",
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = onDownloadMap).padding(vertical = 10.dp),
                 )
                 Text(
                     "Importar mapa (.pmtiles)…",

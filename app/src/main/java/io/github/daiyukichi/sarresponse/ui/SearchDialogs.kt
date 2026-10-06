@@ -188,8 +188,9 @@ fun NewSearchDialog(
                     }
                 }
                 Text(
-                    "El FOV es provisional hasta medir la cámara del payload: ponla a 2 m de una pared, " +
-                        "mide el ancho W (en m) que se ve completo y usa FOV = 2·atan(W/4).",
+                    "FOV por defecto: 41°, cámara Pi v1.3 (OV5647) en modo 1080p, que recorta el sensor " +
+                        "(con el sensor completo en 4:3 serían 53,5°). Para confirmarlo: cámara a 2 m de una " +
+                        "pared, mide el ancho W (en m) que se ve completo y usa FOV = 2·atan(W/4).",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp),
                 )

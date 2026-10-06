@@ -81,6 +81,8 @@ fun MapPane(
     /** Vértices del área que se está dibujando; si no es null, tocar el mapa agrega un vértice. */
     draft: List<GeoPoint>? = null,
     onMapTap: (GeoPoint) -> Unit = {},
+    /** Zona visible (oeste, sur, este, norte) cada vez que el mapa se detiene. */
+    onVisibleBounds: (DoubleArray) -> Unit = {},
 ) {
     val context = LocalContext.current
     var hasBaseMap by remember { mutableStateOf(true) }
@@ -107,6 +109,7 @@ fun MapPane(
     val holder = remember { MapHolder(context) }
     holder.onAlertClick = onAlertClick
     holder.onMapTap = if (draft != null) onMapTap else null
+    holder.onVisibleBounds = onVisibleBounds
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -168,6 +171,7 @@ private class MapHolder(context: Context) {
     var onAlertClick: (Long) -> Unit = {}
     /** Modo "dibujar área": cada toque en el mapa es un vértice. */
     var onMapTap: ((GeoPoint) -> Unit)? = null
+    var onVisibleBounds: (DoubleArray) -> Unit = {}
 
     private var mapLibre: MapLibreMap? = null
     private var style: Style? = null
@@ -210,6 +214,10 @@ private class MapHolder(context: Context) {
         map.getMapAsync { m ->
             mapLibre = m
             m.setMaxZoomPreference(19.0)
+            m.addOnCameraIdleListener {
+                val b = m.projection.visibleRegion.latLngBounds
+                onVisibleBounds(doubleArrayOf(b.longitudeWest, b.latitudeSouth, b.longitudeEast, b.latitudeNorth))
+            }
             m.uiSettings.isRotateGesturesEnabled = false
             m.uiSettings.isTiltGesturesEnabled = false
             m.addOnMapClickListener { latLng ->

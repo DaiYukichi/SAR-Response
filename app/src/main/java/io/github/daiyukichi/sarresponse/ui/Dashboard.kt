@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -60,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import io.github.daiyukichi.sarresponse.LinkState
 import io.github.daiyukichi.sarresponse.LinkStatus
+import io.github.daiyukichi.sarresponse.MapDownload
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.Geo
@@ -67,6 +69,7 @@ import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.core.SearchArea
+import io.github.daiyukichi.sarresponse.core.map.MapRegion
 import io.github.daiyukichi.sarresponse.video.UsbVideo
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -115,7 +118,15 @@ fun DashboardScreen(
     onDraftUndo: () -> Unit,
     onDraftCancel: () -> Unit,
     onDraftConfirm: () -> Unit,
+    /** Modo "elegir zona para descargar el mapa". */
+    pickingMapArea: Boolean = false,
+    mapDownload: MapDownload? = null,
+    onMapAreaCancel: () -> Unit = {},
+    onMapAreaConfirm: (MapRegion) -> Unit = {},
+    onMapDownloadCancel: () -> Unit = {},
+    onMapDownloadDismiss: () -> Unit = {},
 ) {
+    var visibleBounds by remember { mutableStateOf<DoubleArray?>(null) }
     var showPanel by rememberSaveable { mutableStateOf(false) }
     var videoFullscreen by rememberSaveable { mutableStateOf(false) }
     var pipHidden by rememberSaveable { mutableStateOf(false) }
@@ -134,8 +145,8 @@ fun DashboardScreen(
     LaunchedEffect(navTarget == null) { if (navTarget == null) navTargetId = null }
 
     // Para dibujar el área hace falta ver el mapa grande.
-    LaunchedEffect(draft != null) {
-        if (draft != null) {
+    LaunchedEffect(draft != null || pickingMapArea) {
+        if (draft != null || pickingMapArea) {
             showPanel = false
             mapIsMain = true
         }
@@ -177,6 +188,7 @@ fun DashboardScreen(
                         area = area,
                         draft = draft,
                         onMapTap = onMapTap,
+                        onVisibleBounds = { visibleBounds = it },
                     )
                     VideoPane(
                         video,
@@ -215,7 +227,21 @@ fun DashboardScreen(
                         )
                     }
 
-                    if (draft != null) {
+                    if (mapDownload != null) {
+                        MapDownloadBanner(
+                            state = mapDownload,
+                            onCancel = onMapDownloadCancel,
+                            onDismiss = onMapDownloadDismiss,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).zIndex(8f),
+                        )
+                    } else if (pickingMapArea) {
+                        MapAreaBanner(
+                            bounds = visibleBounds,
+                            onCancel = onMapAreaCancel,
+                            onConfirm = onMapAreaConfirm,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(10.dp).zIndex(8f),
+                        )
+                    } else if (draft != null) {
                         DraftBanner(
                             vertices = draft,
                             onUndo = onDraftUndo,
@@ -427,6 +453,96 @@ private fun DraftBanner(
 fun formatArea(m2: Double): String =
     if (m2 < 1_000_000) String.format(Locale.ROOT, "%.1f ha", m2 / 10_000)
     else String.format(Locale.ROOT, "%.2f km²", m2 / 1_000_000)
+
+/** Elegir la zona a descargar: la que se ve en el mapa. */
+@Composable
+private fun MapAreaBanner(
+    bounds: DoubleArray?,
+    onCancel: () -> Unit,
+    onConfirm: (MapRegion) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val region = bounds?.let { (w, s, e, n) -> MapRegion(w, s, e, n, 15).withAffordableZoom() }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface1.copy(alpha = 0.95f))
+            .border(1.5.dp, Primary, RoundedCornerShape(14.dp))
+            .padding(12.dp),
+    ) {
+        Text("Descargar mapa offline", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(
+            "Mueve y acerca el mapa hasta encuadrar la zona de la búsqueda. Se baja con detalle de calle, " +
+                "más el mundo con poco detalle. Necesita internet (solo ahora); en campo funciona sin él.",
+            color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp),
+        )
+        if (region != null) {
+            Text(
+                "Detalle hasta zoom ${region.maxZoom}" + (if (region.maxZoom < 15) " (zona grande: menos detalle)" else "") +
+                    " · ≈ ${region.estimatedMegabytes().roundToInt() + 15} MB",
+                color = Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            OutlinedButton(
+                onClick = onCancel, border = BorderStroke(1.dp, Line),
+                contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
+            ) { Text("Cancelar", color = Muted, fontSize = 12.sp) }
+            Spacer(Modifier.weight(1f))
+            Button(
+                onClick = { region?.let(onConfirm) }, enabled = region != null,
+                colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = Color(0xFF001227)),
+                contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(36.dp),
+            ) { Text("Descargar esta zona", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+        }
+    }
+}
+
+@Composable
+private fun MapDownloadBanner(state: MapDownload, onCancel: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Surface1.copy(alpha = 0.95f))
+            .border(1.5.dp, if (state.error != null) Danger else Primary, RoundedCornerShape(14.dp))
+            .padding(12.dp),
+    ) {
+        Text(
+            when {
+                state.error != null -> "No se pudo descargar el mapa"
+                state.finished -> "Mapa offline listo"
+                else -> "Descargando mapa offline…"
+            },
+            color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+        )
+        Text(
+            state.error ?: if (state.finished) "Ya puedes usarlo sin internet." else
+                state.stage + (state.fraction?.let { " · ${(it * 100).roundToInt()} %" } ?: ""),
+            color = if (state.error != null) Danger else Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp),
+        )
+        if (state.error == null && !state.finished) {
+            Box(
+                Modifier.padding(top = 8.dp).fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(Bg),
+            ) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(state.fraction ?: 0.02f).background(Primary))
+            }
+        }
+        Row(Modifier.padding(top = 8.dp)) {
+            Spacer(Modifier.weight(1f))
+            if (state.error != null || state.finished) {
+                OutlinedButton(onClick = onDismiss, border = BorderStroke(1.dp, Line), modifier = Modifier.height(36.dp)) {
+                    Text("Cerrar", color = Muted, fontSize = 12.sp)
+                }
+            } else {
+                OutlinedButton(onClick = onCancel, border = BorderStroke(1.dp, Line), modifier = Modifier.height(36.dp)) {
+                    Text("Cancelar", color = Muted, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
 
 /** Selector Operación / Panel. */
 @Composable
