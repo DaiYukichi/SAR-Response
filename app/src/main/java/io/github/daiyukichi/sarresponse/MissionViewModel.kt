@@ -77,6 +77,10 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
     /** Una emisión por cada detección nueva (para avisar con sonido, vibración y mensaje). */
     val newAlerts: SharedFlow<Alert> = _newAlerts
 
+    private val _lowBattery = MutableSharedFlow<Packet.LowBattery>(extraBufferCapacity = 4)
+    /** Una emisión por cada aviso de batería baja del payload ($SAB). */
+    val lowBattery: SharedFlow<Packet.LowBattery> = _lowBattery
+
     private val _demoOperator = MutableStateFlow<GeoPoint?>(null)
     /** En la demo, la posición simulada del operador; null cuando se usa el GPS real del teléfono. */
     val demoOperator: StateFlow<GeoPoint?> = _demoOperator.asStateFlow()
@@ -263,6 +267,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
                         backoff = 1_000L
                         val p = tracker.onLine(line)
                         if (p is Packet.Alert) mission.value.alerts.lastOrNull()?.let { _newAlerts.tryEmit(it) }
+                        if (p is Packet.LowBattery) _lowBattery.tryEmit(p)
                     }
                     _link.update { it.copy(error = if (reconnect) "Enlace cerrado" else null) }
                 } catch (e: CancellationException) {

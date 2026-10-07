@@ -243,33 +243,41 @@ Texto ASCII, una línea por paquete, terminada en `\r\n`, con checksum XOR estil
 paquete cabe en un solo envío de la E32 (< 58 bytes).
 
 ```
-$SAR,<unidad>,<seq>,<lat>,<lon>,<confianza>,<hhmmss>*CS    persona detectada
-$SAH,<unidad>,<seq>,<lat>,<lon>,<satélites>,<hhmmss>*CS    latido (cada 30 s)
+$SAR,<unidad>,<seq>,<lat>,<lon>,<confianza>,<hhmmss>*CS            persona detectada
+$SAH,<unidad>,<seq>,<lat>,<lon>,<satélites>,<hhmmss>,<vbat>*CS     latido (cada 30 s)
+$SAB,<unidad>,<seq>,<vbat>*CS                                       batería baja (< 6,8 V)
 ```
 
 | Campo | Descripción |
 |---|---|
 | `unidad` | Identificador del payload (p. ej. `A1`). Permite varios drones en el mismo canal. |
-| `seq` | Contador 0–65535 compartido por ambos tipos; vuelve a 0 después de 65535. |
+| `seq` | Contador 0–65535 compartido por todos los tipos; vuelve a 0 después de 65535. |
 | `lat`, `lon` | Grados decimales (6 decimales ≈ 10 cm). **Vacíos** si el GPS no tiene fix. |
 | `confianza` | 0.00–1.00, solo en `$SAR`. |
 | `satélites` | Satélites en uso, solo en `$SAH`. |
-| `hhmmss` | Hora UTC del GPS. |
+| `hhmmss` | Hora UTC del GPS (vacía sin fix). |
+| `vbat` | Voltaje de la batería del payload (pack 2S): 1 decimal en `$SAH`, 2 decimales en `$SAB`. En `$SAH` es **opcional**: también se acepta el latido de 7 campos del firmware anterior. |
 | `CS` | XOR de todos los caracteres entre `$` y `*`, en dos dígitos hexadecimales. |
 
-Ejemplos:
+Ejemplos reales recibidos por la estación tierra:
 
 ```
-$SAH,A1,0,,,3,120000*2A
+$SAH,A1,0,,,0,,7.6*29        latido sin fix de GPS, batería 7,6 V
+$SAB,A1,0,4.25*21            aviso de batería baja: 4,25 V
 $SAR,A1,2,-12.046410,-77.042810,0.87,120041*1E
 ```
 
 Cómo trata la app los paquetes:
-- **Checksum inválido o formato raro:** se descarta y suma a *corruptos*.
+- **Checksum inválido, tipo desconocido o cantidad de campos incorrecta:** se descarta y suma a
+  *corruptos*.
 - **Repetido** (mismo `seq` que el anterior): se ignora.
 - **Salto de secuencia:** cuenta como paquetes perdidos. Un salto mayor a 1000 se interpreta
   como un reinicio del payload, no como miles de pérdidas.
 - **Coordenadas fuera de rango:** el paquete se rechaza.
+- **Batería:** el último voltaje se muestra en el encabezado (**BATERÍA**: verde ≥ 7,4 V, ámbar,
+  rojo < 6,8 V) y en el panel. Un `$SAB` muestra un **aviso rojo fijo** arriba de todas las vistas,
+  con sonido y vibración, y queda en el registro de la misión. El aviso se apaga al tocar
+  *Entendido* o cuando un latido vuelve a mostrar un voltaje normal (batería cambiada).
 
 ## Estructura del código
 
@@ -513,8 +521,6 @@ dirección del proyecto.
       barómetro) para que la cobertura use la altura medida y no la planificada.
 - [ ] **Recall según tamaño en píxeles** a partir de la evaluación del modelo en la K230, para que
       el umbral de altura salga de datos propios y no de un valor supuesto.
-- [ ] **Batería del payload** en el panel: agregar el voltaje leído por el divisor en ADC0 al
-      latido `$SAH`.
 - [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
 - [ ] **Tema claro** como alternativa al oscuro.
 - [ ] Varios drones a la vez (campo `unidad`) con colores distintos.

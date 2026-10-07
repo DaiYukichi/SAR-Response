@@ -3,6 +3,7 @@ package io.github.daiyukichi.sarresponse.data
 import android.content.Context
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
+import io.github.daiyukichi.sarresponse.core.BatteryEvent
 import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
@@ -111,6 +112,10 @@ class SearchStore(context: Context) {
             s.track.forEach { put(JSONArray().put(it.position.lat).put(it.position.lon).put(it.atMillis)) }
         })
         .put("packets", JSONArray().apply { s.packets.forEach { put(JSONArray().put(it.atMillis).put(it.lostBefore)) } })
+        .put("batteryVolts", s.batteryVolts ?: JSONObject.NULL)
+        .put("batteryAt", s.batteryAtMillis ?: JSONObject.NULL)
+        .put("lowBatteryActive", s.lowBatteryActive)
+        .put("lowBattery", JSONArray().apply { s.lowBatteryEvents.forEach { put(JSONArray().put(it.atMillis).put(it.volts)) } })
         .put("alerts", JSONArray().apply {
             s.alerts.forEach { a ->
                 put(
@@ -128,7 +133,15 @@ class SearchStore(context: Context) {
         val track = j.getJSONArray("track")
         val packets = j.getJSONArray("packets")
         val alerts = j.getJSONArray("alerts")
+        val lowBattery = j.optJSONArray("lowBattery") ?: JSONArray()  // búsquedas viejas no lo tienen
         return MissionState(
+            batteryVolts = if (!j.has("batteryVolts") || j.isNull("batteryVolts")) null else j.getDouble("batteryVolts"),
+            batteryAtMillis = if (!j.has("batteryAt") || j.isNull("batteryAt")) null else j.getLong("batteryAt"),
+            lowBatteryActive = j.optBoolean("lowBatteryActive", false),
+            lowBatteryEvents = (0 until lowBattery.length()).map {
+                val e = lowBattery.getJSONArray(it)
+                BatteryEvent(e.getLong(0), e.getDouble(1))
+            },
             received = j.getInt("received"),
             lost = j.getInt("lost"),
             corrupt = j.getInt("corrupt"),
@@ -162,13 +175,17 @@ class SearchStore(context: Context) {
         .put("pos", p.position?.let { point(it) } ?: JSONObject.NULL)
         .put("value", if (p is Packet.Alert) p.confidence else (p as Packet.Heartbeat).satellites.toDouble())
         .put("utc", p.utc)
+        .put("vbat", (p as? Packet.Heartbeat)?.batteryVolts ?: JSONObject.NULL)
 
     private fun parsePacket(j: JSONObject): Packet {
         val pos = if (j.isNull("pos")) null else point(j.getJSONArray("pos"))
         return if (j.getString("kind") == "SAR") {
             Packet.Alert(j.getString("unit"), j.getInt("seq"), pos, j.getDouble("value"), j.getString("utc"))
         } else {
-            Packet.Heartbeat(j.getString("unit"), j.getInt("seq"), pos, j.getDouble("value").toInt(), j.getString("utc"))
+            Packet.Heartbeat(
+                j.getString("unit"), j.getInt("seq"), pos, j.getDouble("value").toInt(), j.getString("utc"),
+                batteryVolts = if (!j.has("vbat") || j.isNull("vbat")) null else j.getDouble("vbat"),
+            )
         }
     }
 }

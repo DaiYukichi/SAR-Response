@@ -42,6 +42,7 @@ import io.github.daiyukichi.sarresponse.core.LogEvent
 import io.github.daiyukichi.sarresponse.core.MissionLog
 import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.MissionStats
+import io.github.daiyukichi.sarresponse.core.PacketCodec
 import io.github.daiyukichi.sarresponse.core.Search
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -66,7 +67,7 @@ private val PDismissed = Color(0xFF657289)
 
 /**
  * Panel de la misión: indicadores calculados solo con datos reales recibidos del payload.
- * Lo que el protocolo todavía no trae (área cubierta, batería) se indica como no disponible.
+ * El % de área cubierta es una estimación (altura planificada y FOV de la cámara).
  */
 @Composable
 fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: Search?, modifier: Modifier = Modifier) {
@@ -95,6 +96,31 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
                 )
             }
         }
+        item {
+            val v = mission.batteryVolts
+            val low = mission.lowBatteryActive || (v != null && v < PacketCodec.LOW_BATTERY_VOLTS)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Kpi(
+                    "Batería del payload",
+                    v?.let { String.format(Locale.ROOT, "%.2f V", it) } ?: "—",
+                    mission.batteryAtMillis?.let { "medida hace ${formatSeconds(now - it)}" } ?: "el payload aún no la envió",
+                    Modifier.weight(1f),
+                    valueColor = when {
+                        v == null -> PMuted
+                        low -> PDanger
+                        v < 7.4 -> PWarn
+                        else -> POk
+                    },
+                )
+                Kpi(
+                    "Avisos batería baja",
+                    "${mission.lowBatteryEvents.size}",
+                    if (mission.lowBatteryActive) "¡aviso vigente!" else "umbral ${PacketCodec.LOW_BATTERY_VOLTS} V",
+                    Modifier.weight(1f),
+                    valueColor = if (mission.lowBatteryEvents.isEmpty()) PInk else PDanger,
+                )
+            }
+        }
         item { DetectionsCard(st) }
         item { TimelineCard(mission) }
         item { LinkCard(mission, st, now) }
@@ -102,9 +128,8 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
         item { LogCard(log) }
         item {
             Text(
-                "Aún no disponible: batería del payload (requiere agregarla al latido \$SAH). " +
-                    "La cobertura es una estimación con la altura planificada y el FOV de la cámara " +
-                    "(provisional hasta medirlo).",
+                "La cobertura es una estimación con la altura planificada y el FOV de la cámara " +
+                    "(41° por defecto: cámara Pi v1.3 en 1080p; confirmar midiendo).",
                 color = PFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             )
         }
@@ -367,6 +392,7 @@ private fun LogCard(log: List<LogEvent>) {
                 LogEvent.Kind.CONFIRMED -> PConfirmed
                 LogEvent.Kind.DISMISSED -> PDismissed
                 LogEvent.Kind.SILENCE -> PDanger
+                LogEvent.Kind.LOW_BATTERY -> PDanger
             }
             Row(Modifier.padding(vertical = 5.dp)) {
                 Text(fmt.format(Date(e.atMillis)), color = PFaint, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(62.dp))

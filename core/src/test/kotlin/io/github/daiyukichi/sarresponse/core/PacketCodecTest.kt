@@ -29,6 +29,37 @@ class PacketCodecTest {
     }
 
     @Test
+    fun parsesRealPacketsFromCurrentFirmware() {
+        // Recibidos por la estación tierra con el firmware que agrega la batería.
+        val h = PacketCodec.parse("\$SAH,A1,0,,,0,,7.6*29")
+        assertIs<Packet.Heartbeat>(h)
+        assertNull(h.position)
+        assertEquals(0, h.satellites)
+        assertEquals("", h.utc)
+        assertEquals(7.6, h.batteryVolts)
+
+        val b = PacketCodec.parse("\$SAB,A1,0,4.25*21")
+        assertIs<Packet.LowBattery>(b)
+        assertEquals("A1", b.unit)
+        assertEquals(0, b.seq)
+        assertEquals(4.25, b.batteryVolts)
+        assertNull(b.position)
+    }
+
+    @Test
+    fun heartbeatWithAndWithoutBattery() {
+        // 7 campos (firmware anterior): sin batería.
+        assertNull(assertIs<Packet.Heartbeat>(PacketCodec.parse(pkt("SAH,A1,1,8.4,-82.4,9,120030"))).batteryVolts)
+        // 8 campos con vbat vacío: también sin batería.
+        assertNull(assertIs<Packet.Heartbeat>(PacketCodec.parse(pkt("SAH,A1,1,8.4,-82.4,9,120030,"))).batteryVolts)
+        // vbat ilegible o campos de más: paquete inválido.
+        assertNull(PacketCodec.parse(pkt("SAH,A1,1,8.4,-82.4,9,120030,x")))
+        assertNull(PacketCodec.parse(pkt("SAH,A1,1,8.4,-82.4,9,120030,7.6,1")))
+        assertNull(PacketCodec.parse(pkt("SAB,A1,1")))
+        assertNull(PacketCodec.parse(pkt("SAR,A1,1,8.4,-82.4,0.9,120030,7.6")))
+    }
+
+    @Test
     fun knownChecksum() {
         // Valor calculado con la función de Python del payload.
         assertEquals("2A", PacketCodec.checksum("SAH,A1,0,,,3,120000"))
@@ -49,6 +80,10 @@ class PacketCodecTest {
         assertEquals(a, PacketCodec.parse(PacketCodec.format(a)))
         val h = Packet.Heartbeat("A1", 7, null, 0, "000000")
         assertEquals(h, PacketCodec.parse(PacketCodec.format(h)))
+        val hb = Packet.Heartbeat("A1", 8, GeoPoint(8.4, -82.4), 9, "120000", batteryVolts = 7.6)
+        assertEquals(hb, PacketCodec.parse(PacketCodec.format(hb)))
+        val low = Packet.LowBattery("A1", 9, 6.62)
+        assertEquals(low, PacketCodec.parse(PacketCodec.format(low)))
     }
 
     @Test

@@ -71,7 +71,7 @@ data class LossBucket(
 
 /** Evento del registro de misión, derivado del estado (no se guarda aparte). */
 data class LogEvent(val atMillis: Long, val kind: Kind, val text: String) {
-    enum class Kind { START, DETECTION, CONFIRMED, DISMISSED, SILENCE }
+    enum class Kind { START, DETECTION, CONFIRMED, DISMISSED, SILENCE, LOW_BATTERY }
 }
 
 object MissionLog {
@@ -91,6 +91,12 @@ object MissionLog {
                 AlertStatus.DISMISSED -> out += LogEvent(decided, LogEvent.Kind.DISMISSED, "#${a.id} descartada por el operador (en $secs s)")
                 AlertStatus.PENDING -> Unit
             }
+        }
+        for (e in s.lowBatteryEvents) {
+            out += LogEvent(e.atMillis, LogEvent.Kind.LOW_BATTERY, "Batería baja del payload: ${"%.2f".format(Locale.ROOT, e.volts)} V")
+        }
+        for (e in s.lowBatteryEvents) {
+            out += LogEvent(e.atMillis, LogEvent.Kind.LOW_BATTERY, "Batería baja del payload: ${"%.2f".format(Locale.ROOT, e.volts)} V")
         }
         s.packets.zipWithNext { a, b ->
             val gap = b.atMillis - a.atMillis

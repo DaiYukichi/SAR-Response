@@ -28,6 +28,30 @@ class MissionTrackerTest {
     }
 
     @Test
+    fun batteryFromHeartbeatsAndLowBatteryWarning() {
+        fun hbv(seq: Int, v: Double) = PacketCodec.format(Packet.Heartbeat("A1", seq, null, 0, "", batteryVolts = v))
+        tracker.onLine(hbv(0, 7.6))
+        assertEquals(7.6, tracker.state.value.batteryVolts)
+        assertEquals(false, tracker.state.value.lowBatteryActive)
+
+        now = 2_000L
+        tracker.onLine("\$SAB,A1,1,6.65*" + PacketCodec.checksum("SAB,A1,1,6.65"))
+        var s = tracker.state.value
+        assertEquals(6.65, s.batteryVolts)
+        assertEquals(true, s.lowBatteryActive)
+        assertEquals(listOf(BatteryEvent(2_000L, 6.65)), s.lowBatteryEvents)
+        assertEquals(2, s.received)                 // el $SAB cuenta como paquete y para el seq
+        assertEquals(0, s.lost)
+
+        tracker.onLine(hbv(2, 6.6))                 // sigue baja: el aviso se mantiene
+        assertEquals(true, tracker.state.value.lowBatteryActive)
+        tracker.onLine(hbv(3, 8.1))                 // batería cambiada: el aviso se apaga
+        s = tracker.state.value
+        assertEquals(false, s.lowBatteryActive)
+        assertEquals(8.1, s.batteryVolts)
+    }
+
+    @Test
     fun seqWrapAroundIsNotLoss() {
         tracker.onLine(hb(65535))
         tracker.onLine(hb(0))

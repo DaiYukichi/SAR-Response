@@ -67,6 +67,7 @@ import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.Geo
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
+import io.github.daiyukichi.sarresponse.core.PacketCodec
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.core.SearchArea
 import io.github.daiyukichi.sarresponse.core.map.MapRegion
@@ -161,6 +162,13 @@ fun DashboardScreen(
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
         if (!fullscreen) {
             StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick)
+        }
+        // Aviso de batería baja ($SAB): visible en todas las vistas, hasta que el operador lo cierre
+        // o un latido vuelva a mostrar voltaje normal. Un aviso nuevo lo vuelve a mostrar.
+        val lastLow = mission.lowBatteryEvents.lastOrNull()
+        var dismissedLowAt by rememberSaveable { mutableStateOf<Long?>(null) }
+        if (mission.lowBatteryActive && lastLow != null && dismissedLowAt != lastLow.atMillis) {
+            LowBatteryBanner(lastLow.volts, onDismiss = { dismissedLowAt = lastLow.atMillis })
         }
 
         // El panel se dibuja ENCIMA de la vista de operación: así el mapa nunca se destruye
@@ -366,7 +374,15 @@ private fun StatusHeader(
                     "GPS PAYLOAD",
                     if (hb == null) Faint else if (fix) Ok else Warn,
                     if (hb == null) "sin datos" else "${if (fix) "fix" else "sin fix"} · ${hb.satellites} sat",
-                    Modifier.weight(1f),
+                    Modifier.weight(1.2f),
+                )
+
+                val v = mission.batteryVolts
+                Pill(
+                    "BATERÍA",
+                    batteryColor(v, mission.lowBatteryActive),
+                    v?.let { String.format(Locale.ROOT, "%.1f V", it) } ?: "sin dato",
+                    Modifier.weight(0.8f),
                 )
             }
             Spacer(Modifier.height(6.dp))
@@ -376,6 +392,38 @@ private fun StatusHeader(
                 Counter(Danger, "Corruptos", mission.corrupt)
             }
         }
+    }
+}
+
+/** Pack 2S de Li-ion: ~8,4 V llena, 7,4 V nominal; el payload avisa con $SAB por debajo de 6,8 V. */
+private fun batteryColor(volts: Double?, low: Boolean): Color = when {
+    volts == null -> Faint
+    low || volts < PacketCodec.LOW_BATTERY_VOLTS -> Danger
+    volts < 7.4 -> Warn
+    else -> Ok
+}
+
+@Composable
+private fun LowBatteryBanner(volts: Double, onDismiss: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().background(Danger).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "⚠ BATERÍA BAJA DEL PAYLOAD: ${String.format(Locale.ROOT, "%.2f", volts)} V",
+                color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
+            )
+            Text("Aterriza pronto y cambia la batería.", color = Color.White.copy(alpha = 0.9f), fontSize = 11.5.sp)
+        }
+        Text(
+            "Entendido", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.2f))
+                .clickable(onClick = onDismiss)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        )
     }
 }
 

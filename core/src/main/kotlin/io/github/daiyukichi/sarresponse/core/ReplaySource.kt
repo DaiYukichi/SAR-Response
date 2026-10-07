@@ -34,7 +34,10 @@ class ReplaySource(
         // Índices de paso donde "aparece" una persona, con su confianza.
         val detections = mapOf(9 to 0.87, 31 to 0.62, 47 to 0.91, 70 to 0.55)
 
-        emit(PacketCodec.format(Packet.Heartbeat(unit, seq++, null, 3, utc(t))))
+        // Batería simulada: baja de 8,1 V a ~6,7 V en la misión y al final llega un aviso $SAB.
+        val totalSteps = legs * ((legLength / stepMeters).toInt() + 1)
+        fun volts(step: Int) = 8.1 - 1.45 * step / totalSteps
+        emit(PacketCodec.format(Packet.Heartbeat(unit, seq++, null, 3, utc(t), batteryVolts = 8.1)))
         var step = 0
         for (leg in 0 until legs) {
             val steps = (legLength / stepMeters).toInt()
@@ -48,7 +51,10 @@ class ReplaySource(
                     emit(PacketCodec.format(Packet.Alert(unit, seq++, person, conf, utc(t))))
                 }
                 if (step % 3 == 0) {
-                    emit(PacketCodec.format(Packet.Heartbeat(unit, seq++, pos, 9, utc(t))))
+                    emit(PacketCodec.format(Packet.Heartbeat(unit, seq++, pos, 9, utc(t), batteryVolts = volts(step))))
+                }
+                if (step == totalSteps - 4) {
+                    emit(PacketCodec.format(Packet.LowBattery(unit, seq++, volts(step))))
                 }
                 if (step == 55) seq++ // simula un paquete perdido en el aire
                 step++

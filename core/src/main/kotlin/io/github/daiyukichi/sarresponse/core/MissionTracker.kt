@@ -20,6 +20,9 @@ data class TrackPoint(val position: GeoPoint, val atMillis: Long)
 /** Llegada de un paquete válido; [lostBefore] = paquetes que faltaron justo antes (por seq). */
 data class PacketRecord(val atMillis: Long, val lostBefore: Int)
 
+/** Aviso de batería baja recibido ($SAB). */
+data class BatteryEvent(val atMillis: Long, val volts: Double)
+
 data class MissionState(
     val alerts: List<Alert> = emptyList(),
     val track: List<TrackPoint> = emptyList(),
@@ -29,6 +32,12 @@ data class MissionState(
     val lost: Int = 0,
     val corrupt: Int = 0,
     val packets: List<PacketRecord> = emptyList(),
+    /** Último voltaje conocido de la batería del payload (de $SAH o $SAB). */
+    val batteryVolts: Double? = null,
+    val batteryAtMillis: Long? = null,
+    val lowBatteryEvents: List<BatteryEvent> = emptyList(),
+    /** Hay un aviso de batería baja vigente: se apaga si un latido vuelve a mostrar voltaje normal. */
+    val lowBatteryActive: Boolean = false,
 ) {
     val startedAtMillis: Long? get() = packets.firstOrNull()?.atMillis
     val dronePosition: GeoPoint? get() = track.lastOrNull()?.position
@@ -78,6 +87,20 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
                     track = track, lastPacketAtMillis = now,
                     received = s.received + 1, lost = s.lost + gap,
                     packets = s.packets + PacketRecord(now, gap),
+                    batteryVolts = p.batteryVolts ?: s.batteryVolts,
+                    batteryAtMillis = if (p.batteryVolts != null) now else s.batteryAtMillis,
+                    lowBatteryActive = when {
+                        p.batteryVolts == null -> s.lowBatteryActive
+                        else -> p.batteryVolts < PacketCodec.LOW_BATTERY_VOLTS && s.lowBatteryActive
+                    },
+                )
+                is Packet.LowBattery -> s.copy(
+                    lastPacketAtMillis = now,
+                    received = s.received + 1, lost = s.lost + gap,
+                    packets = s.packets + PacketRecord(now, gap),
+                    batteryVolts = p.batteryVolts, batteryAtMillis = now,
+                    lowBatteryEvents = s.lowBatteryEvents + BatteryEvent(now, p.batteryVolts),
+                    lowBatteryActive = true,
                 )
             }
         }

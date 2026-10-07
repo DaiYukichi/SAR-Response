@@ -195,6 +195,13 @@ class MainActivity : ComponentActivity() {
                         toast = alertSummary(alert, operator)
                     }
                 }
+                LaunchedEffect(Unit) {
+                    // Batería baja del payload: mismo sonido y vibración que una detección, más el aviso fijo.
+                    vm.lowBattery.collect { b ->
+                        notifyNewAlert()
+                        toast = String.format(Locale.ROOT, "Batería baja del payload: %.2f V", b.batteryVolts)
+                    }
+                }
                 LaunchedEffect(toast) {
                     if (toast != null) {
                         delay(3_500)
