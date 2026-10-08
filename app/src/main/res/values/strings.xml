@@ -167,7 +167,7 @@
     <string name="share_from_operator">Desde el operador: %1$s al %2$s (%3$d°)</string>
     <string name="share_map">Mapa: %1$s</string>
     <string name="share_subject">SAR-Response · Detección #%1$d</string>
-    <string name="source_title">Conexión y ajustes</string>
+    <string name="source_title">Conexión</string>
     <string name="ground_station">Estación tierra (Bluetooth emparejado):</string>
     <string name="no_paired">No hay dispositivos emparejados. Empareja la estación tierra en Ajustes &gt; Bluetooth.</string>
     <string name="demo_option">Demo (misión simulada)</string>
@@ -186,7 +186,7 @@
     <string name="map_preparing">Preparando mapa offline…</string>
     <string name="map_online">Mapa: en línea</string>
     <string name="map_offline">Mapa: offline</string>
-    <string name="map_none">Sin mapa offline: importa un archivo .pmtiles desde \"Conectar\".</string>
+    <string name="map_none">Sin mapa offline: importa un archivo .pmtiles desde ⚙ Ajustes.</string>
     <string name="video_label">VIDEO</string>
     <string name="video_no_device">Video 5.8 GHz\nConecta el receptor al teléfono por USB (OTG).</string>
     <string name="video_need_camera">Video 5.8 GHz\nFalta el permiso de cámara: Android lo exige para leer el receptor USB.</string>
@@ -201,4 +201,5 @@
     <string name="rec_saved">Video guardado en %1$s</string>
     <string name="rec_failed">No se pudo grabar el video: %1$s</string>
     <string name="link_closed">Enlace cerrado</string>
+    <string name="settings_title">Ajustes</string>
 </resources>

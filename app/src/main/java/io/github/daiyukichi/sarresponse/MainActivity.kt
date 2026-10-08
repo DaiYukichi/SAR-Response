@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 var pickingMapArea by remember { mutableStateOf(false) }
                 val mapDownload by vm.mapDownload.collectAsStateWithLifecycle()
                 var showSources by remember { mutableStateOf(false) }
+                var showSettings by remember { mutableStateOf(false) }
                 var permissionsAsked by remember { mutableStateOf(0) }
                 // El mapa se crea recién después de resolver los permisos: si el aviso de permisos
                 // pausa la app mientras MapLibre se inicia, el mapa queda en blanco.
@@ -250,6 +251,7 @@ class MainActivity : ComponentActivity() {
                             if (missing.isNotEmpty()) permissions.launch(missing.toTypedArray())
                             showSources = true
                         },
+                        onSettingsClick = { showSettings = true },
                         onDecide = vm::decide,
                         onShare = { shareAlert(it, operator) },
                         search = activeSearch,
@@ -321,7 +323,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showSources) {
-                    SourceDialog(
+                    ConnectionDialog(
                         devices = bondedDevices(),
                         onDemo = { vm.startDemo(); showSources = false },
                         onDevice = { device, name ->
@@ -330,6 +332,11 @@ class MainActivity : ComponentActivity() {
                         },
                         onStop = { vm.stop(); showSources = false },
                         onDismiss = { showSources = false },
+                    )
+                }
+                if (showSettings) {
+                    SettingsDialog(
+                        onDismiss = { showSettings = false },
                         hasImportedMap = hasImportedMap,
                         onlineMapEnabled = onlineMapEnabled,
                         onToggleOnlineMap = {
@@ -337,22 +344,22 @@ class MainActivity : ComponentActivity() {
                             OnlineMap.setEnabled(this@MainActivity, onlineMapEnabled)
                         },
                         onDownloadMap = {
-                            showSources = false
+                            showSettings = false
                             pickingMapArea = true
                         },
                         onImportMap = {
-                            showSources = false
+                            showSettings = false
                             importMap.launch(arrayOf("*/*"))
                         },
                         onRemoveImportedMap = {
                             OfflineMap.removeImported(this@MainActivity)
                             hasImportedMap = false
                             mapRevision++
-                            showSources = false
+                            showSettings = false
                         },
                         language = AppLanguage.current(this@MainActivity),
                         onLanguage = { lang ->
-                            showSources = false
+                            showSettings = false
                             AppLanguage.set(this@MainActivity, lang)
                         },
                     )
@@ -442,21 +449,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Conexión con la estación tierra (Bluetooth) o la demo. */
 @Composable
-private fun SourceDialog(
+private fun ConnectionDialog(
     devices: List<Pair<BluetoothDevice, String>>,
     onDemo: () -> Unit,
     onDevice: (BluetoothDevice, String) -> Unit,
     onStop: () -> Unit,
     onDismiss: () -> Unit,
-    hasImportedMap: Boolean,
-    onlineMapEnabled: Boolean,
-    onToggleOnlineMap: () -> Unit,
-    onDownloadMap: () -> Unit,
-    onImportMap: () -> Unit,
-    onRemoveImportedMap: () -> Unit,
-    language: String,
-    onLanguage: (String) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -482,7 +482,31 @@ private fun SourceDialog(
                     stringResource(R.string.demo_option),
                     modifier = Modifier.fillMaxWidth().clickable(onClick = onDemo).padding(vertical = 10.dp),
                 )
-                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
+        dismissButton = { TextButton(onClick = onStop) { Text(stringResource(R.string.disconnect)) } },
+    )
+}
+
+/** Ajustes: mapa (en línea, descargar, importar) e idioma. */
+@Composable
+private fun SettingsDialog(
+    onDismiss: () -> Unit,
+    hasImportedMap: Boolean,
+    onlineMapEnabled: Boolean,
+    onToggleOnlineMap: () -> Unit,
+    onDownloadMap: () -> Unit,
+    onImportMap: () -> Unit,
+    onRemoveImportedMap: () -> Unit,
+    language: String,
+    onLanguage: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(stringResource(R.string.map_section), style = MaterialTheme.typography.labelLarge)
                 Row(
                     Modifier.fillMaxWidth().clickable(onClick = onToggleOnlineMap).padding(vertical = 6.dp),
@@ -530,7 +554,6 @@ private fun SourceDialog(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
-        dismissButton = { TextButton(onClick = onStop) { Text(stringResource(R.string.disconnect)) } },
     )
 }
 

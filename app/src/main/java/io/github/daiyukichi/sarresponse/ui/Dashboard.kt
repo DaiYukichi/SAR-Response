@@ -116,6 +116,7 @@ fun DashboardScreen(
     search: Search?,
     onSearchClick: () -> Unit,
     onSourceClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     onDecide: (Long, AlertStatus) -> Unit,
     onShare: (Alert) -> Unit,
     draft: List<GeoPoint>?,
@@ -165,7 +166,7 @@ fun DashboardScreen(
 
     Column(Modifier.fillMaxSize().background(Bg).safeDrawingPadding()) {
         if (!fullscreen) {
-            StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick)
+            StatusHeader(mission, link, now, showPanel, { showPanel = it }, search, onSearchClick, onSourceClick, onSettingsClick)
         }
         // Aviso de batería baja ($SAB): visible en todas las vistas, hasta que el operador lo cierre
         // o un latido vuelva a mostrar voltaje normal. Un aviso nuevo lo vuelve a mostrar.
@@ -353,12 +354,15 @@ private fun StatusHeader(
     search: Search?,
     onSearchClick: () -> Unit,
     onSourceClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
 ) {
     Surface(color = Surface1, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Tabs(showPanel, onShowPanel)
                 SourceChip(link, onSourceClick)
+                Spacer(Modifier.weight(1f))
+                SettingsButton(onSettingsClick)
             }
             Spacer(Modifier.height(6.dp))
             SearchChip(search, onSearchClick)
@@ -629,6 +633,19 @@ private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
                     .padding(horizontal = 10.dp, vertical = 5.dp),
             )
         }
+    }
+}
+
+/** Ajustes de la app (mapa e idioma), separados de la conexión con la estación tierra. */
+@Composable
+private fun SettingsButton(onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = Faint.copy(alpha = 0.15f),
+        border = BorderStroke(1.dp, Faint.copy(alpha = 0.45f)),
+        modifier = Modifier.clip(CircleShape).clickable(onClickLabel = stringResource(R.string.settings_title), onClick = onClick),
+    ) {
+        Text("⚙", color = Ink, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
     }
 }
 
