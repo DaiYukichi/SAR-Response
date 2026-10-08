@@ -3,7 +3,7 @@
     <!-- English. Spanish (default) is in values/strings.xml. -->
     <string name="tab_operation">Operation</string>
     <string name="tab_panel">Dashboard</string>
-    <string name="source_choose">Choose source</string>
+    <string name="source_choose">Connect ▾</string>
     <string name="source_connecting">Connecting…</string>
     <string name="source_connected">Connected</string>
     <string name="source_retrying">Retrying</string>
@@ -166,7 +166,7 @@
     <string name="share_from_operator">From the operator: %1$s to the %2$s (%3$d°)</string>
     <string name="share_map">Map: %1$s</string>
     <string name="share_subject">SAR-Response · Detection #%1$d</string>
-    <string name="source_title">Source &amp; settings</string>
+    <string name="source_title">Connection &amp; settings</string>
     <string name="ground_station">Ground station (paired Bluetooth):</string>
     <string name="no_paired">No paired devices. Pair the ground station in Settings &gt; Bluetooth.</string>
     <string name="demo_option">Demo (simulated mission)</string>
@@ -183,9 +183,9 @@
     <string name="lang_system">System</string>
     <string name="startup_text">Allow location (your position on the map and the distance to each detection), Bluetooth (the ground station) and the camera (Android requires it to read the USB video receiver). The app works without internet.</string>
     <string name="map_preparing">Preparing offline map…</string>
-    <string name="map_online">● Online</string>
-    <string name="map_offline">● Offline</string>
-    <string name="map_none">No offline map: import a .pmtiles file from \"Choose source\".</string>
+    <string name="map_online">Map: online</string>
+    <string name="map_offline">Map: offline</string>
+    <string name="map_none">No offline map: import a .pmtiles file from \"Connect\".</string>
     <string name="video_label">VIDEO</string>
     <string name="video_no_device">5.8 GHz video\nConnect the receiver to the phone via USB (OTG).</string>
     <string name="video_need_camera">5.8 GHz video\nCamera permission missing: Android requires it to read the USB receiver.</string>

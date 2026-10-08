@@ -4,7 +4,7 @@
     <!-- Español: idioma por defecto. Inglés en values-en/strings.xml (generados juntos). -->
     <string name="tab_operation">Operación</string>
     <string name="tab_panel">Panel</string>
-    <string name="source_choose">Elegir fuente</string>
+    <string name="source_choose">Conectar ▾</string>
     <string name="source_connecting">Conectando…</string>
     <string name="source_connected">Conectado</string>
     <string name="source_retrying">Reintentando</string>
@@ -167,7 +167,7 @@
     <string name="share_from_operator">Desde el operador: %1$s al %2$s (%3$d°)</string>
     <string name="share_map">Mapa: %1$s</string>
     <string name="share_subject">SAR-Response · Detección #%1$d</string>
-    <string name="source_title">Fuente y ajustes</string>
+    <string name="source_title">Conexión y ajustes</string>
     <string name="ground_station">Estación tierra (Bluetooth emparejado):</string>
     <string name="no_paired">No hay dispositivos emparejados. Empareja la estación tierra en Ajustes &gt; Bluetooth.</string>
     <string name="demo_option">Demo (misión simulada)</string>
@@ -184,9 +184,9 @@
     <string name="lang_system">Sistema</string>
     <string name="startup_text">Permite la ubicación (tu posición en el mapa y la distancia a cada detección), el Bluetooth (la estación tierra) y la cámara (Android la exige para leer el receptor de video USB). La app funciona sin internet.</string>
     <string name="map_preparing">Preparando mapa offline…</string>
-    <string name="map_online">● En línea</string>
-    <string name="map_offline">● Offline</string>
-    <string name="map_none">Sin mapa offline: importa un archivo .pmtiles desde \"Elegir fuente\".</string>
+    <string name="map_online">Mapa: en línea</string>
+    <string name="map_offline">Mapa: offline</string>
+    <string name="map_none">Sin mapa offline: importa un archivo .pmtiles desde \"Conectar\".</string>
     <string name="video_label">VIDEO</string>
     <string name="video_no_device">Video 5.8 GHz\nConecta el receptor al teléfono por USB (OTG).</string>
     <string name="video_need_camera">Video 5.8 GHz\nFalta el permiso de cámara: Android lo exige para leer el receptor USB.</string>

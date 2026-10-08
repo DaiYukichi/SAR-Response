@@ -83,17 +83,17 @@ pensada para ese punto medio:
 | **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara del payload (fijo, 53,5°) la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
-| **Mapa en línea u offline** | Con internet, el mapa del mundo entero con detalle de calle se carga en línea (indicador **● En línea**). Sin internet, o si se corta, cambia solo al mapa del teléfono (**● Offline**). Se puede apagar el modo en línea en **Elegir fuente**. |
+| **Mapa en línea u offline** | Con internet, el mapa del mundo entero con detalle de calle se carga en línea (indicador **Mapa: en línea**). Sin internet, o si se corta, cambia solo al mapa del teléfono (**Mapa: offline**). Se puede apagar el modo en línea en **Conectar**. |
 | **Mapa offline** | Mapa vectorial de OpenStreetMap con calles, lugares y nombres en español. Incluido: **mundo con poco detalle + Chiriquí con detalle de calle** (~34 MB). **Descargar mapa de una zona** desde la app (encuadras la zona y listo) o importar un `.pmtiles`. En campo no se descarga nada. |
 | **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
-| **Español e inglés** | Toda la interfaz, los nombres del mapa, el texto para compartir, el CSV y el GPX en español o inglés. Se elige en **Elegir fuente → Idioma · Language** (Sistema / Español / English) o, en Android 13+, también en *Ajustes → Apps → SAR → Idioma*. |
+| **Español e inglés** | Toda la interfaz, los nombres del mapa, el texto para compartir, el CSV y el GPX en español o inglés. Se elige en **Conectar → Idioma · Language** (Sistema / Español / English) o, en Android 13+, también en *Ajustes → Apps → SAR → Idioma*. |
 | **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
 
 ## Cómo se usa en campo
 
 1. **Antes de salir**
-   - Si la búsqueda es fuera de Chiriquí, con internet: **Elegir fuente → Descargar mapa de una
+   - Si la búsqueda es fuera de Chiriquí, con internet: **Conectar → Descargar mapa de una
      zona**, encuadra la zona en el mapa y **Descargar esta zona** ([ver abajo](#mapas-sin-internet)).
    - Abre la app con cielo despejado unos minutos antes: sin internet, el primer fix del GPS
      del teléfono puede tardar de 30 s a unos minutos.
@@ -106,7 +106,7 @@ pensada para ese punto medio:
      Ves la superficie mientras dibujas. También puedes crearla **sin área**.
 3. **En el punto de despegue**
    - Enciende la estación tierra y el payload.
-   - Abre SAR-Response, toca **Elegir fuente** (arriba a la derecha) y elige
+   - Abre SAR-Response, toca **Conectar** (arriba a la derecha) y elige
      **SAR-Estacion**. Concede los permisos de Bluetooth y ubicación.
    - Espera a ver *Enlace LoRa* en verde y *GPS payload: fix* antes de despegar.
    - Conecta el receptor de video 5.8 GHz al teléfono por USB (OTG), pon el receptor en el
@@ -400,7 +400,7 @@ español, sea en línea u offline. Las letras y los íconos del mapa van dentro 
   para ubicarse en cualquier parte, más **Chiriquí con detalle de calle** (~19 MB). Al primer
   arranque se copia al almacenamiento interno; por eso la primera vez tarda unos segundos.
 - **Descargar otra zona desde la app (plug and play):** con internet, antes de salir,
-  **Elegir fuente → Descargar mapa de una zona (requiere internet)**. Mueves y acercas el mapa
+  **Conectar → Descargar mapa de una zona (requiere internet)**. Mueves y acercas el mapa
   hasta encuadrar la zona y tocas **Descargar esta zona**: la app baja **solo esa zona** con detalle
   de calle (más el mundo general), con progreso y opción de cancelar. Si la zona es muy grande,
   baja automáticamente el nivel de detalle para no pasar de ~90 MB.
