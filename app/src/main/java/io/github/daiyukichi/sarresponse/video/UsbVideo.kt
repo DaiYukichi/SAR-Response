@@ -1,12 +1,16 @@
 package io.github.daiyukichi.sarresponse.video
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbDevice
+import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.provider.MediaStore
 import android.view.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,6 +19,8 @@ import androidx.core.content.ContextCompat
 import com.herohan.uvcapp.CameraException
 import com.herohan.uvcapp.CameraHelper
 import com.herohan.uvcapp.ICameraHelper
+import com.herohan.uvcapp.VideoCapture
+import java.io.File
 
 sealed interface VideoStatus {
     data object NoDevice : VideoStatus
@@ -44,6 +50,13 @@ class UsbVideo(private val context: Context) {
     /** Receptor ya pedido: Android avisa la conexión por varias vías y pedirlo dos veces lo trababa. */
     private var selected: UsbDevice? = null
 
+    /** Momento en que empezó la grabación en curso; null si no se está grabando. */
+    var recordingSince by mutableStateOf<Long?>(null)
+        private set
+
+    /** Aviso al terminar una grabación: true = guardada en [RECORDINGS_FOLDER], false = falló. */
+    var onRecordingFinished: ((saved: Boolean, detail: String?) -> Unit)? = null
+
     fun start() {
         if (helper != null) return
         helper = CameraHelper().apply { setStateCallback(callback) }
@@ -61,7 +74,15 @@ class UsbVideo(private val context: Context) {
 
     fun stop() {
         main.removeCallbacksAndMessages(null)
-        helper?.release()
+        val h = helper
+        if (recordingSince != null) {
+            // Dar tiempo a que el grabador cierre el MP4 antes de soltar el receptor (si no, queda ilegible).
+            stopRecording()
+            recordingSince = null
+            main.postDelayed({ h?.release() }, 1_500)
+        } else {
+            h?.release()
+        }
         helper = null
         selected = null
         surfaceAdded = false
@@ -88,6 +109,57 @@ class UsbVideo(private val context: Context) {
         h.closeCamera()
         h.deviceList?.firstOrNull()?.let { select(it) }
     }
+
+    /**
+     * Graba el video tal como llega del receptor (MP4 H.264, sin audio) en Movies/SAR del teléfono.
+     * [name] = nombre del archivo sin extensión. Devuelve false si no hay video para grabar.
+     */
+    fun startRecording(name: String): Boolean {
+        val h = helper ?: return false
+        if (status !is VideoStatus.Streaming || recordingSince != null) return false
+        // Sin audio: el receptor UVC no lo trae y grabaría el micrófono del teléfono (pide otro permiso).
+        h.videoCaptureConfig = h.videoCaptureConfig.setAudioCaptureEnable(false).setBitRate(BIT_RATE)
+        val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, "$name.mp4")
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/$RECORDINGS_FOLDER")
+            }
+            VideoCapture.OutputFileOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values).build()
+        } else {
+            // Android 8–9: carpeta propia de la app (no pide permiso de almacenamiento).
+            val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_MOVIES), RECORDINGS_FOLDER).apply { mkdirs() }
+            VideoCapture.OutputFileOptions.Builder(File(dir, "$name.mp4")).build()
+        }
+        recordingSince = System.currentTimeMillis()
+        h.startRecording(options, object : VideoCapture.OnVideoCaptureCallback {
+            override fun onStart() = Unit
+
+            override fun onVideoSaved(results: VideoCapture.OutputFileResults) {
+                main.post {
+                    recordingSince = null
+                    onRecordingFinished?.invoke(true, null)
+                }
+            }
+
+            override fun onError(code: Int, message: String, cause: Throwable?) {
+                Log.e(TAG, "Error al grabar ($code): $message", cause)
+                main.post {
+                    recordingSince = null
+                    onRecordingFinished?.invoke(false, message)
+                }
+            }
+        })
+        return true
+    }
+
+    /** Termina la grabación; el archivo queda listo cuando llega [onRecordingFinished]. */
+    fun stopRecording() {
+        if (recordingSince == null) return
+        runCatching { helper?.stopRecording() }.onFailure { Log.e(TAG, "stopRecording", it) }
+    }
+
+    val isRecording: Boolean get() = recordingSince != null
 
     private fun select(device: UsbDevice) {
         if (selected?.deviceName == device.deviceName) return
@@ -134,6 +206,8 @@ class UsbVideo(private val context: Context) {
 
         override fun onCameraClose(device: UsbDevice) {
             main.post {
+                // Si se corta el receptor, se cierra el archivo con lo grabado hasta ahí.
+                stopRecording()
                 surface?.takeIf { surfaceAdded }?.let { helper?.removeSurface(it) }
                 surfaceAdded = false
                 if (status is VideoStatus.Streaming) status = VideoStatus.Connecting
@@ -149,6 +223,7 @@ class UsbVideo(private val context: Context) {
 
         override fun onDetach(device: UsbDevice) {
             main.post {
+                stopRecording()
                 selected = null
                 surfaceAdded = false
                 status = VideoStatus.NoDevice
@@ -168,8 +243,12 @@ class UsbVideo(private val context: Context) {
         }
     }
 
-    private companion object {
-        const val TAG = "SAR-Video"
-        const val WATCHDOG_MS = 6_000L
+    companion object {
+        /** Subcarpeta de Movies donde quedan las grabaciones. */
+        const val RECORDINGS_FOLDER = "SAR"
+        private const val TAG = "SAR-Video"
+        private const val WATCHDOG_MS = 6_000L
+        /** 4 Mbit/s ≈ 1,8 GB por hora en 1080p; de sobra para la calidad del video analógico. */
+        private const val BIT_RATE = 4_000_000
     }
 }

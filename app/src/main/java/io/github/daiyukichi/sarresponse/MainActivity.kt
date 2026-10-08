@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -150,7 +151,8 @@ class MainActivity : ComponentActivity() {
                     val observer = LifecycleEventObserver { _, event ->
                         when (event) {
                             Lifecycle.Event.ON_START -> if (startupReady) video.start()
-                            Lifecycle.Event.ON_STOP -> video.stop()
+                            // Si está grabando (p. ej. al compartir una detección por WhatsApp), sigue.
+                            Lifecycle.Event.ON_STOP -> if (!video.isRecording) video.stop()
                             else -> Unit
                         }
                     }
@@ -201,11 +203,21 @@ class MainActivity : ComponentActivity() {
                     Toast.makeText(this, getString(R.string.gpx_exported), Toast.LENGTH_SHORT).show()
                 }
 
-                LaunchedEffect(operator) {
+                // Se colecta una sola vez: si se reiniciara con cada posición del GPS, una detección que
+                // llegara justo en ese momento se perdería sin sonido ni aviso.
+                val currentOperator by rememberUpdatedState(operator)
+                LaunchedEffect(Unit) {
                     vm.newAlerts.collect { alert ->
                         notifyNewAlert()
-                        toast = alertSummary(alert, operator)
+                        toast = alertSummary(alert, currentOperator)
                     }
+                }
+                DisposableEffect(Unit) {
+                    video.onRecordingFinished = { saved, detail ->
+                        toast = if (saved) getString(R.string.rec_saved, "Movies/${UsbVideo.RECORDINGS_FOLDER}")
+                        else getString(R.string.rec_failed, detail ?: "?")
+                    }
+                    onDispose { video.onRecordingFinished = null }
                 }
                 LaunchedEffect(Unit) {
                     // Batería baja del payload: mismo sonido y vibración que una detección, más el aviso fijo.
@@ -262,6 +274,12 @@ class MainActivity : ComponentActivity() {
                         },
                         onMapDownloadCancel = vm::cancelMapDownload,
                         onMapDownloadDismiss = vm::dismissMapDownload,
+                        onToggleRecording = {
+                            if (video.isRecording) video.stopRecording()
+                            else if (video.startRecording("${fileStem(activeSearch)}-video")) {
+                                toast = getString(R.string.rec_started)
+                            }
+                        },
                     )
                 }
 
@@ -344,6 +362,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        video.stop()
         tone?.release()
         super.onDestroy()
     }

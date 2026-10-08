@@ -198,4 +198,8 @@
     <string name="video_open_failed">Could not open the video receiver</string>
     <string name="video_fullscreen">⤢ Full screen</string>
     <string name="video_exit">Exit ⤡</string>
+    <string name="rec_started">Recording video…</string>
+    <string name="rec_saved">Video saved to %1$s</string>
+    <string name="rec_failed">Could not record video: %1$s</string>
+    <string name="link_closed">Link closed</string>
 </resources>

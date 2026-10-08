@@ -28,6 +28,17 @@ class MissionTrackerTest {
     }
 
     @Test
+    fun lowBatteryWithSameSeqAsHeartbeatIsNotADuplicate() {
+        // Paquetes reales del payload: el $SAB puede repetir el seq del $SAH anterior.
+        tracker.onLine("\$SAH,A1,0,,,0,,7.6*29")
+        tracker.onLine("\$SAB,A1,0,4.25*21")
+        val s = tracker.state.value
+        assertEquals(2, s.received)
+        assertEquals(true, s.lowBatteryActive)
+        assertEquals(4.25, s.batteryVolts)
+    }
+
+    @Test
     fun batteryFromHeartbeatsAndLowBatteryWarning() {
         fun hbv(seq: Int, v: Double) = PacketCodec.format(Packet.Heartbeat("A1", seq, null, 0, "", batteryVolts = v))
         tracker.onLine(hbv(0, 7.6))

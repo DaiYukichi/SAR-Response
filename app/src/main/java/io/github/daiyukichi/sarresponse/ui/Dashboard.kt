@@ -130,6 +130,7 @@ fun DashboardScreen(
     onMapAreaConfirm: (MapRegion) -> Unit = {},
     onMapDownloadCancel: () -> Unit = {},
     onMapDownloadDismiss: () -> Unit = {},
+    onToggleRecording: () -> Unit = {},
 ) {
     var visibleBounds by remember { mutableStateOf<DoubleArray?>(null) }
     var showPanel by rememberSaveable { mutableStateOf(false) }
@@ -209,6 +210,7 @@ fun DashboardScreen(
                         modifier = if (mapIsMain) pip else main,
                         fullscreen = fullscreen,
                         onToggleFullscreen = { videoFullscreen = !fullscreen },
+                        onToggleRecording = onToggleRecording,
                     )
                     if (!pipHidden) {
                         // Capa transparente sobre el PiP: tocarlo intercambia las vistas. El botón "–" va

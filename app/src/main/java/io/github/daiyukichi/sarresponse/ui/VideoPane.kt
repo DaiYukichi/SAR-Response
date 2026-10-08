@@ -14,8 +14,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,13 +36,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import io.github.daiyukichi.sarresponse.R
 import io.github.daiyukichi.sarresponse.video.UsbVideo
 import io.github.daiyukichi.sarresponse.video.VideoStatus
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
  * Video analógico 5.8 GHz del VTX del payload, recibido por el receptor UVC conectado por OTG.
  * Se dibuja en un TextureView (respeta recortes, bordes redondeados y rotación).
  *
  * En la vista grande hay dos botones: girar el video de a 90° (girado aprovecha el alto del
- * teléfono en vertical) y pantalla completa (oculta encabezado y lista).
+ * teléfono en vertical) y pantalla completa (oculta encabezado y lista). Con video, ● REC graba
+ * lo que llega a un MP4 en Movies/SAR.
  */
 @Composable
 fun VideoPane(
@@ -48,8 +54,10 @@ fun VideoPane(
     modifier: Modifier = Modifier,
     fullscreen: Boolean = false,
     onToggleFullscreen: () -> Unit = {},
+    onToggleRecording: () -> Unit = {},
 ) {
     val status = video.status
+    val recordingSince = video.recordingSince
     var rotation by rememberSaveable { mutableIntStateOf(0) }
     BoxWithConstraints(modifier.background(Color(0xFF101418)), contentAlignment = Alignment.Center) {
         val ratio = (status as? VideoStatus.Streaming)?.let { it.width.toFloat() / it.height } ?: (16f / 9f)
@@ -100,12 +108,13 @@ fun VideoPane(
             )
         } else if (compact) {
             Text(
-                stringResource(R.string.video_label), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
+                if (recordingSince != null) "● REC" else stringResource(R.string.video_label),
+                color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(5.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(if (recordingSince != null) RecRed else Color.Black.copy(alpha = 0.6f))
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
@@ -115,23 +124,47 @@ fun VideoPane(
                 Modifier.align(Alignment.BottomEnd).padding(10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (status is VideoStatus.Streaming || recordingSince != null) {
+                    if (recordingSince != null) {
+                        // Contador de la grabación en curso.
+                        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                        LaunchedEffect(recordingSince) {
+                            while (true) {
+                                now = System.currentTimeMillis()
+                                delay(500)
+                            }
+                        }
+                        VideoButton("■ ${formatClock(now - recordingSince)}", background = RecRed, onClick = onToggleRecording)
+                    } else {
+                        VideoButton("● REC", onClick = onToggleRecording)
+                    }
+                }
                 VideoButton("⟳ ${rotation}°") { rotation = (rotation + 90) % 360 }
-                VideoButton(stringResource(if (fullscreen) R.string.video_exit else R.string.video_fullscreen), onToggleFullscreen)
+                VideoButton(stringResource(if (fullscreen) R.string.video_exit else R.string.video_fullscreen), onClick = onToggleFullscreen)
             }
         }
     }
 }
 
 @Composable
-private fun VideoButton(text: String, onClick: () -> Unit) {
+private fun VideoButton(text: String, background: Color = Color.Black.copy(alpha = 0.55f), onClick: () -> Unit) {
     Text(
         text, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.Black.copy(alpha = 0.55f))
+            .background(background)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
     )
+}
+
+private val RecRed = Color(0xFFDC2626)
+
+/** mm:ss (o h:mm:ss) desde que empezó la grabación. */
+private fun formatClock(millis: Long): String {
+    val t = (millis / 1000).coerceAtLeast(0)
+    return if (t >= 3600) String.format(Locale.ROOT, "%d:%02d:%02d", t / 3600, t / 60 % 60, t % 60)
+    else String.format(Locale.ROOT, "%02d:%02d", t / 60, t % 60)
 }
 
 /** Mayor rectángulo con proporción [ratio] (ancho/alto) que entra en [w]×[h]. */

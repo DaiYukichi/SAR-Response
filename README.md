@@ -167,6 +167,12 @@ entre el teléfono y la estación, o entre la estación y el dron.
   **▣ Mostrar mapa / video** la vuelve a mostrar.
 - **Video grande:** **⟳** lo gira de a 90° (girado aprovecha el alto del teléfono en vertical) y
   **⤢ Completa** oculta el encabezado y la lista.
+- **Grabar:** **● REC** graba el video tal como llega del receptor (MP4 H.264, 1080p, sin audio,
+  ≈ 1,8 GB por hora) en **Movies/SAR** del teléfono, con el nombre de la búsqueda. Mientras graba,
+  el botón muestra **■ mm:ss** (tócalo para terminar) y la miniatura dice **● REC**. Sigue grabando
+  si sales un momento de la app (por ejemplo, para compartir una detección); si se desconecta el
+  receptor, el archivo se cierra con lo grabado hasta ahí. Sirve como evidencia y para revisar
+  después las detecciones con calma.
 
 ### Pestañas Operación / Panel
 
@@ -313,7 +319,7 @@ SAR-Response/
 │           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista del video del receptor
-│       └── video/UsbVideo.kt  Receptor FPV UVC por USB: permiso, apertura, 720p
+│       └── video/UsbVideo.kt  Receptor FPV UVC por USB: permiso, apertura, grabación
 ├── app/src/main/res/values*/  Textos: español (values) e inglés (values-en)
 ├── app/src/main/assets/mapa/  Estilos del mapa (es/en), letras e íconos (y region.pmtiles, generado)
 ├── tools/mapa/                Scripts para generar el mapa offline y su estilo
@@ -486,8 +492,10 @@ cambiar en `ReplaySource.kt`.
 
 ## Limitaciones conocidas
 
-- **El video UVC no se ha probado todavía con el receptor real** (el emulador no tiene USB).
-  Receptor usado: "RXC FPV receiver" 5.8 GHz, salida UVC 720p.
+- Receptor usado: "RXC FPV receiver" 5.8 GHz (chip MacroSilicon), salida UVC MJPEG 1920×1080;
+  probado en un POCO con Android 16. **La grabación todavía no se probó con el receptor real.**
+- El video grabado no tiene marcas de tiempo por detección: para cruzarlo con las detecciones se
+  usa la hora de inicio del archivo y la hora de cada detección del CSV.
 - El % de área cubierta es una estimación: depende del ancho de barrido que ingresa el operador.
 - La posición de una detección es la del GPS del **dron** en ese momento, no la proyección
   exacta del píxel al suelo. A 40–60 m de altura el error puede ser de varios metros.
@@ -511,9 +519,11 @@ dirección del proyecto.
 
 ### A corto plazo (solo software)
 
-- [x] ~~Video 5.8 GHz dentro de la app con el receptor UVC por OTG~~ (hecho; probado solo sin
-      receptor en emulador, falta la prueba en el teléfono con el receptor).
-- [ ] Grabar el video de la misión junto con las detecciones.
+- [x] ~~Video 5.8 GHz dentro de la app con el receptor UVC por OTG~~ (hecho y probado con el
+      receptor real).
+- [x] ~~Grabar el video de la misión~~ (hecho: MP4 en Movies/SAR).
+- [ ] Marcar las detecciones dentro del video grabado (capítulos o subtítulos con la hora de cada
+      una) y reproducirlo en la app junto al mapa.
 - [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
 - [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
 - [ ] **Medir el FOV real** de la cámara del payload (hoy 41°, calculado del modo 1080p de la OV5647).

@@ -53,6 +53,7 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
     val state: StateFlow<MissionState> = _state.asStateFlow()
 
     private var lastSeq: Int? = null
+    private var lastType: Class<out Packet>? = null
     private var nextAlertId = 1L
 
     /** Procesa una línea. Devuelve el paquete si es válido y nuevo; null si está corrupto o repetido. */
@@ -69,8 +70,11 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
             // d == 0 es un duplicado; un salto enorme suele ser un reinicio del payload, no pérdidas.
             if (d in 2..MAX_PLAUSIBLE_GAP) d - 1 else 0
         } ?: 0
-        val duplicate = lastSeq == p.seq
+        // Repetido = mismo seq y mismo tipo (un reenvío). Un $SAB con el mismo seq que el $SAH anterior
+        // no es un repetido: el payload puede no avanzar el contador entre tipos distintos.
+        val duplicate = lastSeq == p.seq && lastType == p.javaClass
         lastSeq = p.seq
+        lastType = p.javaClass
         if (duplicate) return null
 
         _state.update { s ->
@@ -121,6 +125,7 @@ class MissionTracker(private val clock: () -> Long = System::currentTimeMillis) 
     /** Retoma una búsqueda guardada; el próximo paquete no cuenta pérdidas contra el último seq viejo. */
     fun restore(saved: MissionState) {
         lastSeq = null
+        lastType = null
         nextAlertId = (saved.alerts.maxOfOrNull { it.id } ?: 0L) + 1
         _state.value = saved
     }

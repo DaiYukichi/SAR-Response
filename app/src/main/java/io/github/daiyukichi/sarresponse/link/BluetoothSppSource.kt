@@ -30,7 +30,7 @@ class BluetoothSppSource(
                 socket.connect()
                 onConnected()
                 socket.inputStream.bufferedReader(Charsets.US_ASCII).forEachLine { trySendBlocking(it) }
-                close(IOException("La estación tierra cerró la conexión"))
+                close(IOException("Ground station closed the connection"))
             } catch (e: IOException) {
                 close(e)
             }

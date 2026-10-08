@@ -199,4 +199,8 @@
     <string name="video_open_failed">No se pudo abrir el receptor de video</string>
     <string name="video_fullscreen">⤢ Completa</string>
     <string name="video_exit">Salir ⤡</string>
+    <string name="rec_started">Grabando video…</string>
+    <string name="rec_saved">Video guardado en %1$s</string>
+    <string name="rec_failed">No se pudo grabar el video: %1$s</string>
+    <string name="link_closed">Enlace cerrado</string>
 </resources>

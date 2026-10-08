@@ -290,7 +290,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         if (p is Packet.LowBattery) _lowBattery.tryEmit(p)
                     }
-                    _link.update { it.copy(error = if (reconnect) "Enlace cerrado" else null) }
+                    _link.update { it.copy(error = if (reconnect) getApplication<Application>().getString(R.string.link_closed) else null) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
