@@ -24,8 +24,11 @@ class MissionStatsTest {
         val id = tracker.state.value.alerts.single().id
         tracker.decide(id, AlertStatus.CONFIRMED)
 
-        val st = MissionStats.from(tracker.state.value, now = 150_000)
-        assertEquals(150_000, st.elapsedMillis)
+        // La búsqueda se creó a los 10 s: el tiempo de misión cuenta desde ahí, no desde el primer paquete.
+        val st = MissionStats.from(tracker.state.value, now = 150_000, missionStartMillis = 10_000)
+        assertEquals(140_000, st.elapsedMillis)
+        // Terminada a los 100 s: el reloj se detiene.
+        assertEquals(90_000, MissionStats.from(tracker.state.value, 150_000, 10_000, missionEndMillis = 100_000).elapsedMillis)
         assertTrue(st.distanceFlownMeters in 395.0..405.0) // 0→100→200 m y vuelta a la base
         assertEquals(1, st.confirmed)
         assertEquals(15_000, st.avgDecisionMillis)
@@ -42,8 +45,8 @@ class MissionStatsTest {
 
     @Test
     fun emptyMission() {
-        val st = MissionStats.from(MissionState(), now = 1_000)
-        assertEquals(0, st.elapsedMillis)
+        val st = MissionStats.from(MissionState(), now = 1_000, missionStartMillis = null)
+        assertNull(st.elapsedMillis)                // sin búsqueda, el reloj no corre
         assertNull(st.avgDecisionMillis)
         assertTrue(st.lossTimeline.isEmpty())
     }

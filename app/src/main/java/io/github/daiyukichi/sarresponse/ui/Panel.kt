@@ -71,7 +71,7 @@ private val PDismissed = Color(0xFF657289)
  */
 @Composable
 fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: Search?, modifier: Modifier = Modifier) {
-    val st = MissionStats.from(mission, now)
+    val st = MissionStats.from(mission, now, search?.createdAtMillis, search?.finishedAtMillis)
     val log = MissionLog.events(mission)
     LazyColumn(
         modifier.background(PBg),
@@ -81,7 +81,16 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
         item { SearchCard(search, mission) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Kpi("Tiempo de misión", formatDuration(st.elapsedMillis), "desde el primer paquete", Modifier.weight(1f))
+                Kpi(
+                    "Tiempo de misión",
+                    st.elapsedMillis?.let { formatDuration(it) } ?: "—",
+                    when {
+                        search == null -> "crea una búsqueda para empezar"
+                        search.finishedAtMillis != null -> "búsqueda terminada"
+                        else -> "desde que se creó la búsqueda"
+                    },
+                    Modifier.weight(1f),
+                )
                 Kpi("Distancia volada", String.format(Locale.ROOT, "%.2f km", st.distanceFlownMeters / 1000), "según el GPS del payload", Modifier.weight(1f))
             }
         }

@@ -136,8 +136,9 @@ Los umbrales de LoRa salen del latido del payload, que llega cada 30 s.
 Debajo: **paquetes recibidos · perdidos · corruptos**.
 
 La barra **BÚSQUEDA** muestra la búsqueda en curso y la superficie de su área; al tocarla se abre la
-lista: exportar GPX/CSV, terminar, crear una nueva, o abrir/borrar una anterior. Si llegan datos sin
-ninguna búsqueda abierta, la app crea una automáticamente para no perder nada.
+lista: exportar GPX/CSV, terminar, crear una nueva, o abrir/borrar una anterior. Si se conecta la estación
+tierra o llega una **detección** sin ninguna búsqueda abierta, la app crea una automáticamente
+(conservando la detección) para no perder nada.
 - *Perdidos* se calcula con el número de secuencia: si después del 41 llega el 44, se
   perdieron 2.
 - *Corruptos* son líneas con checksum inválido o mal formadas (ruido de radio).
@@ -174,7 +175,7 @@ conserva el zoom y la posición.
 
 | Tarjeta del panel | Qué muestra y de dónde sale |
 |---|---|
-| Tiempo de misión / Distancia volada | Desde el primer paquete; suma del recorrido según el GPS del payload. |
+| Tiempo de misión / Distancia volada | Desde que se **creó la búsqueda** hasta que se termina (sin búsqueda no corre, aunque el payload ya mande latidos); suma del recorrido según el GPS del payload. |
 | Confirmadas / Paquetes perdidos | Confirmadas sobre el total; % perdido según los saltos de secuencia (verde < 5 %, ámbar < 15 %, rojo). |
 | Detecciones | Pendientes, confirmadas y descartadas, y el **tiempo promedio que tarda el operador en decidir**. |
 | Línea de tiempo | Cada detección según el momento en que llegó y su confianza (50–100 %), con el color de su estado. |

@@ -221,6 +221,17 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         return Search.planned("b$now", name.ifBlank { "Búsqueda ${timeLabel()}" }, now, area, altitudeMeters, hfovDegrees)
     }
 
+    /** Crea una búsqueda con lo ya recibido (sin borrarlo), para que se guarde. */
+    private suspend fun adoptCurrentAsSearch() {
+        val search = newSearch("Búsqueda ${timeLabel()}", null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES)
+        _activeSearch.value = search
+        withContext(Dispatchers.IO) {
+            store.save(search, mission.value)
+            store.activeId = search.id
+        }
+        refreshList()
+    }
+
     private suspend fun activate(search: Search) {
         saveActive()
         tracker.reset()
@@ -266,7 +277,12 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
                         }
                         backoff = 1_000L
                         val p = tracker.onLine(line)
-                        if (p is Packet.Alert) mission.value.alerts.lastOrNull()?.let { _newAlerts.tryEmit(it) }
+                        if (p is Packet.Alert) {
+                            // Una detección sin búsqueda abierta (p. ej. tras terminar una) no se pierde:
+                            // se crea una búsqueda que la incluye.
+                            if (_activeSearch.value == null) adoptCurrentAsSearch()
+                            mission.value.alerts.lastOrNull()?.let { _newAlerts.tryEmit(it) }
+                        }
                         if (p is Packet.LowBattery) _lowBattery.tryEmit(p)
                     }
                     _link.update { it.copy(error = if (reconnect) "Enlace cerrado" else null) }

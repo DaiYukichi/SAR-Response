@@ -7,7 +7,8 @@ import java.util.Locale
  * (El % de área cubierta y la batería del payload necesitan datos que el protocolo aún no trae.)
  */
 data class MissionStats(
-    val elapsedMillis: Long,
+    /** Duración de la búsqueda; null si no hay búsqueda (el reloj no corre sin una). */
+    val elapsedMillis: Long?,
     val distanceFlownMeters: Double,
     val pending: Int,
     val confirmed: Int,
@@ -23,7 +24,18 @@ data class MissionStats(
     val total: Int get() = pending + confirmed + dismissed
 
     companion object {
-        fun from(s: MissionState, now: Long, buckets: Int = 12): MissionStats {
+        /**
+         * [missionStartMillis]/[missionEndMillis]: cuándo se creó y se terminó la búsqueda. El tiempo de
+         * misión se cuenta desde la creación de la búsqueda, no desde el primer paquete: el payload ya
+         * manda latidos en la mesa, antes de que exista una búsqueda.
+         */
+        fun from(
+            s: MissionState,
+            now: Long,
+            missionStartMillis: Long?,
+            missionEndMillis: Long? = null,
+            buckets: Int = 12,
+        ): MissionStats {
             val start = s.startedAtMillis
             val decided = s.alerts.mapNotNull { a -> a.decidedAtMillis?.let { it - a.receivedAtMillis } }
 
@@ -33,7 +45,7 @@ data class MissionStats(
 
             val sent = s.received + s.lost
             return MissionStats(
-                elapsedMillis = start?.let { now - it } ?: 0L,
+                elapsedMillis = missionStartMillis?.let { (missionEndMillis ?: now) - it }?.coerceAtLeast(0),
                 distanceFlownMeters = s.track.zipWithNext { a, b -> Geo.distanceMeters(a.position, b.position) }.sum(),
                 pending = s.alerts.count { it.status == AlertStatus.PENDING },
                 confirmed = s.alerts.count { it.status == AlertStatus.CONFIRMED },
@@ -80,7 +92,7 @@ object MissionLog {
 
     fun events(s: MissionState): List<LogEvent> {
         val out = mutableListOf<LogEvent>()
-        s.startedAtMillis?.let { out += LogEvent(it, LogEvent.Kind.START, "Primer paquete del payload: misión en curso") }
+        s.startedAtMillis?.let { out += LogEvent(it, LogEvent.Kind.START, "Primer paquete del payload") }
         for (a in s.alerts) {
             val conf = (a.packet.confidence * 100).toInt()
             out += LogEvent(a.receivedAtMillis, LogEvent.Kind.DETECTION, "Detección #${a.id} recibida · $conf%")
