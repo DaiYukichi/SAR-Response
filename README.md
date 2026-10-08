@@ -5,582 +5,597 @@
 
 # SAR-Response
 
-**App Android de estación de tierra para drones de búsqueda y rescate (SAR) con IA a bordo.**
-En el teléfono aparece instalada como **SAR**.
+**English** · [Español](README.es.md)
 
-SAR-Response es la parte "en manos del rescatista" del proyecto *Universal Edge-AI Rescue
-Payload for Low-Cost Search and Rescue Drones* (IEEE Response Quest 2026). El payload es un
-módulo de bajo costo que se monta en cualquier dron: una CanMV K230 busca personas en la
-imagen de la cámara con una red neuronal (YOLO) **dentro del dron, sin internet**, y cuando
-encuentra a alguien envía un aviso por **LoRa** con su posición GPS. Al mismo tiempo, transmite
-video analógico por **5.8 GHz**.
+**Android ground-station app for search and rescue (SAR) drones with on-board AI.**
+It installs on the phone as **SAR**.
 
-La app junta todo eso en una sola pantalla para que el operador pueda **ver dónde está el
-dron, dónde se detectó a alguien, mirar el video, decidir** si la detección es real y
-**guiar a quien va a pie** hasta esa persona.
+SAR-Response is the "in the rescuer's hands" part of the project *Universal Edge-AI Rescue
+Payload for Low-Cost Search and Rescue Drones* (IEEE Response Quest 2026). The payload is a
+low-cost module that mounts on any drone: a CanMV K230 looks for people in the camera image
+with a neural network (YOLO) **on board, without internet**, and when it finds someone it sends
+an alert over **LoRa** with its GPS position. At the same time it transmits analog video over
+**5.8 GHz**.
+
+The app brings all of that onto one screen so the operator can **see where the drone is,
+where someone was detected, watch the video, decide** whether the detection is real, and
+**guide the people on foot** to that person.
 
 <p align="center">
-  <img src="docs/img/mapa.png" width="300" alt="Operación: área de búsqueda, recorrido del dron, detecciones pendientes, confirmadas y descartadas">
+  <img src="docs/img/mapa.png" width="300" alt="Operation view: search area, drone track, pending, confirmed and dismissed detections">
   &nbsp;&nbsp;
-  <img src="docs/img/panel.png" width="300" alt="Panel: cobertura del área, tiempo de misión, batería del payload y aviso de batería baja">
+  <img src="docs/img/panel.png" width="300" alt="Dashboard: area coverage, mission time, payload battery and low-battery warning">
 </p>
 
-<p align="center"><sub>Capturas con la misión simulada (modo demo). Datos del mapa © colaboradores de OpenStreetMap.</sub></p>
+<p align="center"><sub>Screenshots taken with the simulated mission (demo mode), app in Spanish. Map data © OpenStreetMap contributors.</sub></p>
 
 ---
 
-## Índice
+## Contents
 
-- [Por qué existe](#por-qué-existe)
-- [Qué hace](#qué-hace)
-- [Cómo se usa en campo](#cómo-se-usa-en-campo)
-- [La pantalla, parte por parte](#la-pantalla-parte-por-parte)
-- [Arquitectura del sistema](#arquitectura-del-sistema)
-- [Protocolo de los paquetes LoRa](#protocolo-de-los-paquetes-lora)
-- [Estructura del código](#estructura-del-código)
-- [Compilar e instalar](#compilar-e-instalar)
-- [Estación tierra (ESP32)](#estación-tierra-esp32)
-- [Mapas sin internet](#mapas-sin-internet)
-- [Modo demo](#modo-demo)
-- [Permisos y privacidad](#permisos-y-privacidad)
-- [Decisiones de diseño](#decisiones-de-diseño)
-- [Limitaciones conocidas](#limitaciones-conocidas)
-- [Trabajo futuro](#trabajo-futuro)
-- [Contribuir](#contribuir)
-- [Licencia](#licencia)
+- [Why it exists](#why-it-exists)
+- [What it does](#what-it-does)
+- [How to use it in the field](#how-to-use-it-in-the-field)
+- [The screen, piece by piece](#the-screen-piece-by-piece)
+- [System architecture](#system-architecture)
+- [LoRa packet protocol](#lora-packet-protocol)
+- [Code structure](#code-structure)
+- [Build and install](#build-and-install)
+- [Ground station (ESP32)](#ground-station-esp32)
+- [Maps without internet](#maps-without-internet)
+- [Demo mode](#demo-mode)
+- [Permissions and privacy](#permissions-and-privacy)
+- [Design decisions](#design-decisions)
+- [Known limitations](#known-limitations)
+- [Future work](#future-work)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## Por qué existe
+## Why it exists
 
-En una búsqueda real, el operador del dron no puede quedarse mirando el video sin parpadear
-durante horas, y una persona en el suelo vista desde 40–60 m de altura ocupa apenas unos
-pocos píxeles. La IA del payload no se cansa, pero tampoco es infalible. SAR-Response está
-pensada para ese punto medio:
+In a real search, the drone operator cannot stare at the video without blinking for hours, and
+a person on the ground seen from 40–60 m up covers only a few pixels. The payload's AI does not
+get tired, but it is not infallible either. SAR-Response is built for that middle ground:
 
-- **La IA propone, la persona decide.** Cada detección llega como *pendiente* y el operador
-  la confirma o la descarta mirando el video y el contexto.
-- **Funciona sin internet.** Zonas de desastre, montaña o selva rara vez tienen datos móviles.
-  El enlace es LoRa + Bluetooth y siempre hay un mapa offline en el teléfono. Si hay internet,
-  el mapa se carga **en línea** (mundo entero con detalle); si se corta, la app pasa sola al offline.
-- **Hardware barato y común.** Un teléfono Android, un ESP32, un módulo LoRa E32 y un
-  receptor de video FPV de los que se usan en drones de carreras.
+- **The AI proposes, the human decides.** Every detection arrives as *pending* and the operator
+  confirms or dismisses it by looking at the video and the context.
+- **Works without internet.** Disaster zones, mountains and jungle rarely have mobile data.
+  The link is LoRa + Bluetooth and there is always an offline map on the phone. If there is
+  internet, the map loads **online** (whole world in detail); if it drops, the app switches to
+  the offline map by itself.
+- **Cheap, common hardware.** An Android phone, an ESP32, an E32 LoRa module and an FPV video
+  receiver like the ones used on racing drones.
 
-## Qué hace
+## What it does
 
-| Función | Detalle |
+| Feature | Details |
 |---|---|
-| **Mapa en vivo** | Recorrido del dron (línea azul), posición actual (punto azul), un pin por cada detección, la posición del operador (celeste) y una leyenda. Las detecciones pendientes "laten" para llamar la atención. |
-| **Video 5.8 GHz** | Video del VTX del payload (con los recuadros de detección dibujados a bordo) desde un receptor FPV **UVC** conectado al teléfono por USB/OTG. Se lee directamente por USB, sin depender de que el teléfono soporte cámaras USB. |
-| **Vistas intercambiables** | Video o mapa a pantalla completa, con la otra vista en miniatura (picture-in-picture). Tocar la miniatura las intercambia sin perder el zoom ni la posición del mapa; el botón **–** la oculta y **▣ Mostrar** la trae de vuelta. El video se puede **rotar** de a 90° y ver en **pantalla completa**. |
-| **Detecciones** | Tarjetas con número, confianza de la IA (con color), hora UTC, coordenadas y **distancia y rumbo desde el operador** ("293 m · N 7°"). Botones **Confirmar** / **Descartar**. Las pendientes van primero. |
-| **Navegar a una detección** | Banner con la distancia, el rumbo y una flecha que apunta hacia la persona **según hacia dónde mira el teléfono** (brújula), más una línea punteada en el mapa del operador al objetivo. |
-| **Compartir coordenadas** | En una detección confirmada, envía por WhatsApp, SMS, correo, etc. un texto que se entiende sin la app: coordenadas, distancia y rumbo desde el operador, enlace a OpenStreetMap y enlace `geo:`. |
-| **Avisos** | Cada detección nueva suena, vibra y muestra un mensaje con su confianza, distancia y dirección ("Detección #1 · 87% · 293 m N"), aunque el operador esté mirando el video. |
-| **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
-| **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
-| **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
-| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara del payload (fijo, 53,5°) la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. El área de la búsqueda en curso se puede **dibujar después o redibujar** (barra de la búsqueda → Dibujar / Redibujar área), sin perder lo recibido; si no tiene, la barra muestra **＋ área**. |
-| **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
-| **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
-| **Mapa en línea u offline** | Con internet, el mapa del mundo entero con detalle de calle se carga en línea (indicador **Mapa: en línea**). Sin internet, o si se corta, cambia solo al mapa del teléfono (**Mapa: offline**). Se puede apagar el modo en línea en **⚙ Ajustes**. |
-| **Mapa offline** | Mapa vectorial de OpenStreetMap con calles, lugares y nombres en español. Incluido: **mundo con poco detalle + Chiriquí con detalle de calle** (~34 MB). **Descargar mapa de una zona** desde la app (encuadras la zona y listo) o importar un `.pmtiles`. En campo no se descarga nada. |
-| **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
-| **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
-| **Español e inglés** | Toda la interfaz, los nombres del mapa, el texto para compartir, el CSV y el GPX en español o inglés. Se elige en **⚙ Ajustes → Idioma · Language** (Sistema / Español / English) o, en Android 13+, también en *Ajustes → Apps → SAR → Idioma*. |
-| **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
+| **Live map** | Drone track (blue line), current position (blue dot), one pin per detection, the operator's position (cyan) and a legend. Pending detections "pulse" to draw attention. |
+| **5.8 GHz video** | Video from the payload's VTX (with the detection boxes drawn on board) from a **UVC** FPV receiver plugged into the phone over USB/OTG. It is read directly over USB, without relying on the phone supporting USB cameras. |
+| **Swappable views** | Video or map full size, with the other one as a thumbnail (picture-in-picture). Tapping the thumbnail swaps them without losing the map's zoom or position; **–** hides it and **▣ Show** brings it back. The video can be **rotated** in 90° steps and shown **full screen**. |
+| **Video recording** | **● REC** records the incoming video to an MP4 in **Movies/SAR**, named after the search. |
+| **Detections** | Cards with number, AI confidence (color-coded), UTC time, coordinates and **distance and bearing from the operator** ("293 m · N 7°"). **Confirm** / **Dismiss** buttons. Pending ones come first. |
+| **Navigate to a detection** | Banner with distance, bearing and an arrow pointing at the person **according to where the phone is facing** (compass), plus a dashed line on the map from the operator to the target. |
+| **Share coordinates** | On a confirmed detection, sends via WhatsApp, SMS, email, etc. a text that makes sense without the app: coordinates, distance and bearing from the operator, an OpenStreetMap link and a `geo:` link. |
+| **Alerts** | Every new detection beeps, vibrates and shows a message with its confidence, distance and direction ("Detection #1 · 87% · 293 m N"), even while the operator is watching the video. |
+| **Protection against mistaps** | The list never scrolls by itself, and for 0.8 s after it reorders (a detection arrived or a decision was made) the buttons do not respond, so a tap never lands on another card. |
+| **Link health** | Bluetooth status with the ground station, time since the last LoRa packet, payload GPS fix and satellites, payload battery, and received / lost / corrupt packets. |
+| **Automatic reconnection** | If Bluetooth drops, the app retries by itself (1 s, 2 s, 4 s… up to 10 s). |
+| **Payload battery** | Last voltage of the payload's 2S pack in the header and the dashboard. A `$SAB` low-battery packet shows a fixed red warning on every view, with sound and vibration. |
+| **Searches** | Each search has a name, an **area drawn on the map** (tapping its corners) and a **planned flight altitude**: with it and the payload camera's FOV (fixed, 53.5°) the app computes the swath width and **how many pixels a person covers** in the model's image, and warns when the altitude is too high to detect well. The area's border is shown, there is a warning if the drone leaves it, and detections outside the area are flagged. Everything is **saved on the phone**: if Android kills the app, the search comes back as it was; previous searches can be opened, exported or deleted. The current search's area can be **drawn later or redrawn** (search bar → Draw / Redraw area) without losing what was received; if it has none, the bar shows **＋ area**. |
+| **Mission dashboard** | **Dashboard** tab with indicators computed only from real data: mission time, distance flown, confirmed / total, % of lost packets, **average operator decision time**, detection timeline, packet loss per mission segment and longest silence, team distances and the mission log. |
+| **Export** | **GPX** with confirmed and pending detections (not dismissed ones) and the drone track, for OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** with each detection, its status, when it arrived, when it was decided, how many seconds that took and how far it was from the operator, for the after-action report. |
+| **Online or offline map** | With internet, the world map with street detail loads online (indicator **Map: online**). Without internet, or if it drops, it switches by itself to the map stored on the phone (**Map: offline**). Online mode can be turned off in **⚙ Settings**. |
+| **Offline map** | OpenStreetMap vector map with streets, places and names in Spanish or English. Bundled: **low-detail world + Chiriquí (Panama) with street detail** (~34 MB). **Download a map area** from the app (frame the area and that's it) or import a `.pmtiles` file. Nothing is downloaded in the field. |
+| **Ready on launch** | On first launch it asks for location, Bluetooth and camera (for the USB receiver) permissions on a welcome screen; then the map starts centered on the operator's position. |
+| **Demo mode** | Simulated mission to try out and present the app without a drone or radio. |
+| **Spanish and English** | The whole interface, map labels, shared text, CSV and GPX in Spanish or English. Chosen in **⚙ Settings → Idioma · Language** (System / Español / English) or, on Android 13+, also in *Settings → Apps → SAR → Language*. |
+| **Screen always on** | While the app is open, the phone does not lock. |
 
-## Cómo se usa en campo
+## How to use it in the field
 
-1. **Antes de salir**
-   - Si la búsqueda es fuera de Chiriquí, con internet: **⚙ Ajustes → Descargar mapa de una
-     zona**, encuadra la zona en el mapa y **Descargar esta zona** ([ver abajo](#mapas-sin-internet)).
-   - Abre la app con cielo despejado unos minutos antes: sin internet, el primer fix del GPS
-     del teléfono puede tardar de 30 s a unos minutos.
-   - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
-     *Ajustes → Bluetooth*.
-2. **Crear la búsqueda**
-   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre y altura de vuelo.
-     La app muestra el barrido y el tamaño de una persona en píxeles (✓ / ⚠).
-   - **Dibujar área:** toca las esquinas del área en el mapa (mínimo 3) y **Crear búsqueda**.
-     Ves la superficie mientras dibujas. También puedes crearla **sin área**.
-3. **En el punto de despegue**
-   - Enciende la estación tierra y el payload.
-   - Abre SAR-Response, toca **Conectar** (arriba, junto a las pestañas) y elige
-     **SAR-Estacion**. Concede los permisos de Bluetooth y ubicación.
-   - Espera a ver *Enlace LoRa* en verde y *GPS payload: fix* antes de despegar.
-   - Conecta el receptor de video 5.8 GHz al teléfono por USB (OTG), pon el receptor en el
-     canal del VTX (por ejemplo A3 = 5825 MHz) y **acepta el permiso USB** que muestra Android.
-4. **Durante el vuelo**
-   - Cuando suene una alerta, toca la detección en la lista: el mapa se centra en ella.
-   - Mira el video y decide: **Confirmar** (pin rojo) o **Descartar** (pin gris).
-5. **Para llegar a la persona**
-   - Toca **➤ Navegar a** en la detección: la flecha del banner apunta hacia ella y la
-     distancia se actualiza mientras caminas.
-   - O toca **Compartir coordenadas** para mandárselas al equipo que va a pie.
-6. **Al terminar**
-   - En la barra **BÚSQUEDA**: **Exportar GPX / CSV** y **Terminar esta búsqueda**. Queda guardada
-     en la lista de anteriores.
+1. **Before leaving**
+   - If the search is outside Chiriquí, with internet: **⚙ Settings → Download a map area**,
+     frame the area on the map and **Download this area** ([see below](#maps-without-internet)).
+   - Open the app under open sky a few minutes beforehand: without internet, the phone's first
+     GPS fix can take from 30 s to a few minutes.
+   - Pair the phone with the ground station (**SAR-Estacion**) once, in *Settings → Bluetooth*.
+2. **Create the search**
+   - Tap the **SEARCH** bar → **＋ New search**: name and flight altitude. The app shows the
+     swath and a person's size in pixels (✓ / ⚠).
+   - **Draw area:** tap the area's corners on the map (at least 3) and **Create search**. You
+     see the surface while drawing. You can also create it **without an area** and draw it later.
+3. **At the take-off point**
+   - Turn on the ground station and the payload.
+   - Open the app, tap **Connect ▾** (next to the tabs) and choose **SAR-Estacion**. Grant the
+     Bluetooth and location permissions.
+   - Wait until *LoRa link* is green and *Payload GPS: fix* before taking off.
+   - Plug the 5.8 GHz video receiver into the phone over USB (OTG), set the receiver to the
+     VTX channel (for example A3 = 5825 MHz) and **accept the USB permission** Android shows.
+   - Optional: **● REC** to record the video of the whole flight.
+4. **During the flight**
+   - When an alert sounds, tap the detection in the list: the map centers on it.
+   - Watch the video and decide: **Confirm** (red pin) or **Dismiss** (grey pin).
+5. **To reach the person**
+   - Tap **➤ Navigate** on the detection: the banner's arrow points at it and the distance
+     updates as you walk.
+   - Or tap **Share coordinates** to send them to the team on foot.
+6. **When done**
+   - In the **SEARCH** bar: **Export GPX / CSV** and **Finish this search**. It stays saved in
+     the list of previous searches.
 
-## La pantalla, parte por parte
+## The screen, piece by piece
 
-### Encabezado (arriba)
+### Header (top)
 
-| Indicador | Verde | Ámbar | Rojo | Gris |
+| Indicator | Green | Amber | Red | Grey |
 |---|---|---|---|---|
-| **Fuente** (botón arriba a la derecha) | Conectado a la estación tierra o a la demo | Conectando… | Reintentando tras una caída | Ninguna fuente elegida |
-| **Enlace LoRa: hace N s** | Último paquete hace < 35 s | 35–65 s (se perdió un latido) | > 65 s: enlace con el dron probablemente caído | Aún no llega nada |
-| **GPS payload** | El payload tiene fix | El payload no tiene fix (las alertas llegarán sin posición) | — | Sin latidos todavía |
+| **Connect ▾** (next to the tabs) | Connected to the ground station or the demo | Connecting… | Retrying after a drop | No source chosen |
+| **LoRa link: N s ago** | Last packet < 15 s ago | 15–25 s (a heartbeat was missed) | > 25 s: link with the drone probably down | Nothing received yet |
+| **Payload GPS** | The payload has a fix | No fix (alerts will arrive without a position) | — | No heartbeats yet |
+| **Battery** | ≥ 7.4 V | Below 7.4 V | Below 6.8 V or low-battery warning | Not sent yet |
 
-Los umbrales de LoRa salen del latido del payload, que llega cada 30 s.
+The LoRa thresholds come from the payload's heartbeat, sent every 10 s.
 
-Debajo: **paquetes recibidos · perdidos · corruptos**.
+Below: **received · lost · corrupt packets**.
+- *Lost* is computed from the sequence number: if 44 arrives after 41, 2 were lost.
+- *Corrupt* are lines with an invalid checksum or a malformed format (radio noise).
 
-La barra **BÚSQUEDA** muestra la búsqueda en curso y la superficie de su área; al tocarla se abre la
-lista: exportar GPX/CSV, terminar, crear una nueva, o abrir/borrar una anterior. Si se conecta la estación
-tierra o llega una **detección** sin ninguna búsqueda abierta, la app crea una automáticamente
-(conservando la detección) para no perder nada.
-- *Perdidos* se calcula con el número de secuencia: si después del 41 llega el 44, se
-  perdieron 2.
-- *Corruptos* son líneas con checksum inválido o mal formadas (ruido de radio).
+Having two separate indicators (Bluetooth and LoRa) shows **where** the problem is: between the
+phone and the station, or between the station and the drone.
 
-Tener dos indicadores separados (Bluetooth y LoRa) permite saber **dónde** está el problema:
-entre el teléfono y la estación, o entre la estación y el dron.
+The **SEARCH** bar shows the current search and its area; tapping it opens the list: draw or
+redraw the area, export GPX/CSV, finish, create a new one, or open/delete a previous one. If the
+ground station connects or a **detection** arrives with no search open, the app creates one
+automatically (keeping the detection) so nothing is lost.
 
-### Vista principal y miniatura
+**⚙ Settings** holds the map options (online map, download an area, import, back to the
+bundled map) and the language.
 
-- **Mapa**:
-  - Línea azul: recorrido del dron.
-  - Punto azul grande: última posición conocida.
-  - Punto celeste: el operador (el teléfono).
-  - Pines: 🟠 pendiente (con un halo que late) · 🔴 confirmada · ⚪ descartada. El seleccionado
-    lleva un anillo azul.
-  - Línea roja punteada: del operador a la detección hacia la que se está navegando.
-  - Tocar un pin lo selecciona en la lista.
-- **Banner de navegación** (abajo del mapa): distancia, punto cardinal, grados y una flecha.
-  - Si el teléfono tiene brújula, la flecha apunta hacia la persona **según hacia dónde mira el
-    teléfono**: basta con girar hasta que apunte hacia adelante y caminar.
-  - Sin brújula, el rumbo se da respecto al norte, y el banner lo indica.
-- **Video**: imagen del VTX del payload. Si no hay receptor conectado, la vista lo indica
-  ("Conecta el receptor…", "Acepta el permiso USB…") y el resto de la app sigue funcionando.
-- **Miniatura** (arriba a la derecha): tócala para intercambiar mapa y video; **–** la oculta y
-  **▣ Mostrar mapa / video** la vuelve a mostrar.
-- **Video grande:** **⟳** lo gira de a 90° (girado aprovecha el alto del teléfono en vertical) y
-  **⤢ Completa** oculta el encabezado y la lista.
-- **Grabar:** **● REC** graba el video tal como llega del receptor (MP4 H.264, 1080p, sin audio,
-  ≈ 0,9 GB por hora) en **Movies/SAR** del teléfono, con el nombre de la búsqueda. Mientras graba,
-  el botón muestra **■ mm:ss** (tócalo para terminar) y la miniatura dice **● REC**. Sigue grabando
-  si sales un momento de la app (por ejemplo, para compartir una detección); si se desconecta el
-  receptor, el archivo se cierra con lo grabado hasta ahí. Sirve como evidencia y para revisar
-  después las detecciones con calma.
+### Main view and thumbnail
 
-### Pestañas Operación / Panel
+- **Map**:
+  - Blue line: drone track.
+  - Big blue dot: last known position.
+  - Cyan dot: the operator (the phone).
+  - Pins: 🟠 pending (with a pulsing halo) · 🔴 confirmed · ⚪ dismissed. The selected one has a
+    blue ring.
+  - Dashed red line: from the operator to the detection being navigated to.
+  - Tapping a pin selects it in the list.
+- **Navigation banner** (bottom of the map): distance, compass point, degrees and an arrow.
+  - If the phone has a compass, the arrow points at the person **according to where the phone
+    is facing**: just turn until it points forward and walk.
+  - Without a compass, the bearing is given relative to north, and the banner says so.
+- **Video**: the payload's VTX image. If no receiver is connected, the view says so
+  ("Connect the receiver…", "Accept the USB permission…") and the rest of the app keeps working.
+- **Thumbnail** (top right): tap it to swap map and video; **–** hides it and
+  **▣ Show map / video** brings it back.
+- **Large video:** **⟳** rotates it in 90° steps (rotated, it uses the phone's height in
+  portrait) and **⤢ Full screen** hides the header and the list.
+- **Record:** **● REC** records the video exactly as it comes from the receiver (MP4 H.264,
+  1080p, no audio, ≈ 0.9 GB per hour) to **Movies/SAR** on the phone, named after the search.
+  While recording, the button shows **■ mm:ss** (tap it to stop) and the thumbnail says
+  **● REC**. It keeps recording if you briefly leave the app (for example, to share a
+  detection); if the receiver is disconnected, the file is closed with what was recorded so far.
+  Useful as evidence and to review the detections calmly afterwards.
 
-Arriba a la izquierda. **Operación** es la vista de trabajo (mapa, video y detecciones).
-**Panel** muestra el resumen de la misión; el mapa sigue cargado debajo, así que al volver
-conserva el zoom y la posición.
+### Operation / Dashboard tabs
 
-| Tarjeta del panel | Qué muestra y de dónde sale |
+Top left. **Operation** is the working view (map, video and detections). **Dashboard** shows
+the mission summary; the map stays loaded underneath, so it keeps its zoom and position when you
+go back.
+
+| Dashboard card | What it shows and where it comes from |
 |---|---|
-| Tiempo de misión / Distancia volada | Desde que se **creó la búsqueda** hasta que se termina (sin búsqueda no corre, aunque el payload ya mande latidos); suma del recorrido según el GPS del payload. |
-| Confirmadas / Paquetes perdidos | Confirmadas sobre el total; % perdido según los saltos de secuencia (verde < 5 %, ámbar < 15 %, rojo). |
-| Detecciones | Pendientes, confirmadas y descartadas, y el **tiempo promedio que tarda el operador en decidir**. |
-| Línea de tiempo | Cada detección según el momento en que llegó y su confianza (50–100 %), con el color de su estado. |
-| Calidad del enlace | Último paquete, **mayor silencio** y pérdida por tramo de la misión; un tramo gris punteado significa que no llegó nada. |
-| Equipo | Distancia del operador al dron y a cada detección activa. |
-| Registro de misión | Primer paquete, detecciones recibidas, decisiones (con cuánto tardaron) y silencios de más de 45 s. |
+| Mission time / Distance flown | From when the **search was created** until it is finished (it does not run without a search, even if the payload is already sending heartbeats); sum of the track according to the payload's GPS. |
+| Confirmed / Lost packets | Confirmed over total; % lost from sequence gaps (green < 5 %, amber < 15 %, red). |
+| Payload battery / Low-battery warnings | Last voltage and how long ago it was measured; number of `$SAB` warnings received. |
+| Detections | Pending, confirmed and dismissed, and the **average time the operator takes to decide**. |
+| Timeline | Each detection by arrival time and confidence (50–100 %), in its status color. |
+| Link quality | Last packet, **longest silence** and loss per mission segment; a dashed grey segment means nothing arrived. |
+| Team | Distance from the operator to the drone and to each active detection. |
+| Mission log | First packet, detections received, decisions (with how long they took), low-battery warnings and silences longer than 45 s. |
 
-La primera tarjeta es la **búsqueda**: superficie del área, ancho de barrido, detecciones fuera del
-área y **% del área cubierta (estimado)**. La cobertura cuenta qué parte del área quedó a menos de
-medio ancho de barrido del recorrido del dron; es una estimación que supone cámara hacia abajo y
-altura constante.
+The first card is the **search**: area surface, swath width, detections outside the area and
+**% of the area covered (estimated)**. Coverage counts which part of the area was within half a
+swath of the drone's track; it is an estimate that assumes a downward-facing camera and constant
+altitude.
 
-**Altura, barrido y tamaño de la persona.** Con la cámara hacia abajo, el ancho de terreno visto es
-`2 × altura × tan(FOV/2)`. El modelo recibe la imagen reducida a 640 px de ancho, así que una persona
-de tamaño `s` ocupa `s × 640 / barrido` píxeles. El modelo se entrenó con personas de unos 13×16 px;
-por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV es fijo, 53,5°**: la cámara
-del payload es la Raspberry Pi v1.3 (OV5647, módulo P5V04A) en modo **1280×960**, que usa el sensor
-completo (53,5° × 41,4°). Si se cambia de modo o de lente, se cambia `DEFAULT_HFOV_DEGREES` en
+**Altitude, swath and person size.** With the camera facing down, the ground width seen is
+`2 × altitude × tan(FOV/2)`. The model receives the image scaled to 640 px wide, so a person of
+size `s` covers `s × 640 / swath` pixels. The model was trained on people of about 13×16 px;
+below ~12 px detection drops, and the app warns about it. The **FOV is fixed at 53.5°**: the
+payload camera is the Raspberry Pi v1.3 (OV5647, P5V04A module) in **1280×960** mode, which uses
+the full sensor (53.5° × 41.4°). If the mode or lens changes, change `DEFAULT_HFOV_DEGREES` in
 `CameraGeometry.kt`.
 
-### Panel de detecciones (abajo)
+### Detections panel (bottom)
 
-- El encabezado muestra el total y cuántas están **por revisar**. Tócalo para plegar o desplegar.
-- Cada tarjeta muestra el número, la confianza de la IA y su estado; debajo, la distancia y el
-  rumbo desde el operador, la hora UTC y las coordenadas.
-- **Confianza con color:** ≥ 80 % rosado (alta), 60–79 % ámbar (media), < 60 % gris (baja; mírala con
-  más cuidado en el video).
-- Botones según el estado:
-  - Pendiente: **✓ Confirmar**, **✕ Descartar** y **➤** (navegar).
-  - Confirmada: **➤ Navegar a** y **Compartir coordenadas**.
-- Tocar una tarjeta centra el mapa en esa detección. Si estabas viendo el video, cambia al mapa.
-- Las pendientes siempre van arriba. Después de cada decisión la lista vuelve arriba, donde quedan
-  las que faltan revisar. Si hay tarjetas fuera de la vista, aparece **↑ Ver más**.
+- The header shows the total and how many are **to review**. Tap it to collapse or expand.
+- Each card shows the number, the AI confidence and its status; below, the distance and bearing
+  from the operator, the UTC time and the coordinates.
+- **Color-coded confidence:** ≥ 80 % pink (high), 60–79 % amber (medium), < 60 % grey (low;
+  look at it more carefully in the video).
+- Buttons by status:
+  - Pending: **✓ Confirm**, **✕ Dismiss** and **➤** (navigate).
+  - Confirmed: **➤ Navigate** and **Share coordinates**.
+- Tapping a card centers the map on that detection. If you were watching the video, it switches
+  to the map.
+- Pending ones always stay on top. After each decision the list goes back to the top, where the
+  ones left to review are. If there are cards out of view, **↑ See more** appears.
 
-## Arquitectura del sistema
+## System architecture
 
 ```
-                 ┌─────────────── DRON (payload) ───────────────┐
-                 │  Cámara → CanMV K230 (YOLO INT8, ~12 FPS)      │
+                 ┌─────────────── DRONE (payload) ────────────────┐
+                 │  Camera → CanMV K230 (YOLO INT8, ~12 FPS)      │
                  │     │  GPS ──┘                                 │
                  │     ├─ UART → E32 LoRa 915 MHz ───────────────────────┐
-                 │     └─ UART → ESP32 (dibuja recuadros) → VTX 5.8 GHz ─┼──┐
+                 │     └─ UART → ESP32 (draws boxes) → VTX 5.8 GHz ──────┼──┐
                  └────────────────────────────────────────────────┘     │  │
                                                                          │  │
-                 ┌──────────── ESTACIÓN TIERRA ────────────┐            │  │
+                 ┌──────────── GROUND STATION ─────────────┐            │  │
                  │  E32 LoRa ◄─────────────────────────────────────────┘  │
                  │     ├─► ESP32 ── Bluetooth SPP ──────────────┐         │
-                 │     └─► YP-05 (USB) → PC (opcional)          │         │
+                 │     └─► YP-05 (USB) → PC (optional)          │         │
                  └──────────────────────────────────────────────┘         │
                                                                ▼          │
-                 ┌──────────── TELÉFONO ANDROID ───────────────────┐      │
-                 │  SAR-Response  ◄── OTG ── receptor UVC 5.8 GHz ◄──────┘
+                 ┌──────────── ANDROID PHONE ──────────────────────┐      │
+                 │  SAR-Response  ◄── OTG ── UVC 5.8 GHz receiver ◄──────┘
                  └─────────────────────────────────────────────────┘
 ```
 
-- **Datos (LoRa → Bluetooth):** pocos bytes, gran alcance y bajo consumo. Llevan lo que la
-  app necesita para decidir: qué, dónde y cuándo.
-- **Video (5.8 GHz analógico):** latencia muy baja y sin pantallas congeladas por pérdida de
-  paquetes, como pasa con el video digital. Sirve para que una persona verifique lo que
-  detectó la IA.
+- **Data (LoRa → Bluetooth):** few bytes, long range and low power. It carries what the app
+  needs to decide: what, where and when.
+- **Video (analog 5.8 GHz):** very low latency and no frozen screens from packet loss, as happens
+  with digital video. It lets a person verify what the AI detected.
 
-## Protocolo de los paquetes LoRa
+## LoRa packet protocol
 
-Texto ASCII, una línea por paquete, terminada en `\r\n`, con checksum XOR estilo NMEA. Cada
-paquete cabe en un solo envío de la E32 (< 58 bytes).
+ASCII text, one line per packet, terminated by `\r\n`, with an NMEA-style XOR checksum. Each
+packet fits in a single E32 transmission (< 58 bytes).
 
 ```
-$SAR,<unidad>,<seq>,<lat>,<lon>,<confianza>,<hhmmss>*CS            persona detectada
-$SAH,<unidad>,<seq>,<lat>,<lon>,<satélites>,<hhmmss>,<vbat>*CS     latido (cada 30 s)
-$SAB,<unidad>,<seq>,<vbat>*CS                                       batería baja (< 6,8 V)
+$SAR,<unit>,<seq>,<lat>,<lon>,<confidence>,<hhmmss>*CS             person detected
+$SAH,<unit>,<seq>,<lat>,<lon>,<satellites>,<hhmmss>,<vbat>*CS      heartbeat (every 10 s)
+$SAB,<unit>,<seq>,<vbat>*CS                                         low battery (< 6.8 V)
 ```
 
-| Campo | Descripción |
+| Field | Description |
 |---|---|
-| `unidad` | Identificador del payload (p. ej. `A1`). Permite varios drones en el mismo canal. |
-| `seq` | Contador 0–65535 compartido por todos los tipos; vuelve a 0 después de 65535. |
-| `lat`, `lon` | Grados decimales (6 decimales ≈ 10 cm). **Vacíos** si el GPS no tiene fix. |
-| `confianza` | 0.00–1.00, solo en `$SAR`. |
-| `satélites` | Satélites en uso, solo en `$SAH`. |
-| `hhmmss` | Hora UTC del GPS (vacía sin fix). |
-| `vbat` | Voltaje de la batería del payload (pack 2S): 1 decimal en `$SAH`, 2 decimales en `$SAB`. En `$SAH` es **opcional**: también se acepta el latido de 7 campos del firmware anterior. |
-| `CS` | XOR de todos los caracteres entre `$` y `*`, en dos dígitos hexadecimales. |
+| `unit` | Payload identifier (e.g. `A1`). Allows several drones on the same channel. |
+| `seq` | Counter 0–65535 shared by all packet types; wraps to 0 after 65535. |
+| `lat`, `lon` | Decimal degrees (6 decimals ≈ 10 cm). **Empty** if the GPS has no fix. |
+| `confidence` | 0.00–1.00, only in `$SAR`. |
+| `satellites` | Satellites in use, only in `$SAH`. |
+| `hhmmss` | GPS UTC time (empty without a fix). |
+| `vbat` | Payload battery voltage (2S pack): 1 decimal in `$SAH`, 2 decimals in `$SAB`. **Optional** in `$SAH`: the 7-field heartbeat of the previous firmware is also accepted. |
+| `CS` | XOR of all characters between `$` and `*`, as two hex digits. |
 
-Ejemplos reales recibidos por la estación tierra:
+Real examples received by the ground station:
 
 ```
-$SAH,A1,0,,,0,,7.6*29        latido sin fix de GPS, batería 7,6 V
-$SAB,A1,0,4.25*21            aviso de batería baja: 4,25 V
+$SAH,A1,0,,,0,,7.6*29        heartbeat without GPS fix, battery 7.6 V
+$SAB,A1,0,4.25*21            low-battery warning: 4.25 V
 $SAR,A1,2,-12.046410,-77.042810,0.87,120041*1E
 ```
 
-Cómo trata la app los paquetes:
-- **Checksum inválido, tipo desconocido o cantidad de campos incorrecta:** se descarta y suma a
-  *corruptos*.
-- **Repetido** (mismo `seq` que el anterior): se ignora.
-- **Salto de secuencia:** cuenta como paquetes perdidos. Un salto mayor a 1000 se interpreta
-  como un reinicio del payload, no como miles de pérdidas.
-- **Coordenadas fuera de rango:** el paquete se rechaza.
-- **Batería:** el último voltaje se muestra en el encabezado (**BATERÍA**: verde ≥ 7,4 V, ámbar,
-  rojo < 6,8 V) y en el panel. Un `$SAB` muestra un **aviso rojo fijo** arriba de todas las vistas,
-  con sonido y vibración, y queda en el registro de la misión. El aviso se apaga al tocar
-  *Entendido* o cuando un latido vuelve a mostrar un voltaje normal (batería cambiada).
+How the app handles packets:
+- **Invalid checksum, unknown type or wrong number of fields:** discarded and counted as
+  *corrupt*.
+- **Repeated** (same `seq` and same type as the previous one): ignored.
+- **Sequence gap:** counted as lost packets. A gap larger than 1000 is interpreted as a payload
+  reboot, not as thousands of losses.
+- **Out-of-range coordinates:** the packet is rejected.
+- **Battery:** the last voltage is shown in the header (**BATTERY**: green ≥ 7.4 V, amber,
+  red < 6.8 V) and on the dashboard. A `$SAB` shows a **fixed red warning** above every view,
+  with sound and vibration, and is written to the mission log. The warning goes away when
+  *Got it* is tapped or when a heartbeat shows a normal voltage again (battery replaced).
 
-## Estructura del código
+## Code structure
 
 ```
 SAR-Response/
-├── core/                      Kotlin puro (sin Android), con pruebas
+├── core/                      Pure Kotlin (no Android), with tests
 │   └── src/main/kotlin/.../core/
-│       ├── Packet.kt          Modelo de paquetes + PacketCodec (parse/format/checksum)
-│       ├── MissionTracker.kt  Estado de la misión: detecciones, recorrido, estadísticas
-│       ├── LinkSource.kt      Interfaz de cualquier origen de datos (Flow<String>)
-│       ├── ReplaySource.kt    Misión simulada para demos
-│       ├── GpxExporter.kt     Exportación GPX 1.1
-│       ├── MissionStats.kt    Indicadores del panel, registro de misión y exportación CSV
-│       ├── SearchArea.kt      Búsqueda y su área: superficie, contiene/no contiene, cobertura
-│       ├── CameraGeometry.kt  Altura → ancho de barrido → píxeles de una persona
-│       └── map/               PMTiles: formato, recortador por zonas y CLI para el mapa incluido
-│       └── Geo.kt             Distancia, rumbo, punto cardinal y desplazamientos
-├── app/                       Aplicación Android (Jetpack Compose)
+│       ├── Packet.kt          Packet model + PacketCodec (parse/format/checksum)
+│       ├── MissionTracker.kt  Mission state: detections, track, statistics, battery
+│       ├── LinkSource.kt      Interface for any data source (Flow<String>)
+│       ├── ReplaySource.kt    Simulated mission for demos
+│       ├── GpxExporter.kt     GPX 1.1 export
+│       ├── MissionStats.kt    Dashboard indicators, mission log and CSV export
+│       ├── SearchArea.kt      Search and its area: surface, contains, coverage
+│       ├── CameraGeometry.kt  Altitude → swath width → pixels of a person
+│       ├── Geo.kt             Distance, bearing, compass point and offsets
+│       └── map/               PMTiles: format, area extractor and CLI for the bundled map
+├── app/                       Android app (Jetpack Compose)
 │   └── src/main/java/.../sarresponse/
-│       ├── MainActivity.kt    Permisos, elección de fuente, avisos, exportación
-│       ├── MissionViewModel.kt Conexión con reintentos, búsquedas y guardado automático
-│       ├── data/SearchStore.kt Búsquedas guardadas como JSON en el teléfono
-│       ├── link/BluetoothSppSource.kt  Bluetooth clásico (RFCOMM/SPP)
+│       ├── MainActivity.kt    Permissions, connection, settings, alerts, export
+│       ├── MissionViewModel.kt Link with retries, searches and autosave
+│       ├── data/SearchStore.kt Searches saved as JSON on the phone
+│       ├── link/BluetoothSppSource.kt  Classic Bluetooth (RFCOMM/SPP)
+│       ├── video/UsbVideo.kt  UVC FPV receiver over USB: permission, opening, recording
 │       └── ui/
-│           ├── Dashboard.kt   Barra de estado, intercambio video/mapa, panel de detecciones
-│           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
-│           ├── OfflineMap.kt  Archivo .pmtiles local, importación/descarga y estilo
-│           ├── OnlineMap.kt   Mapa en línea y detección de conexión (cambio automático)
-│           ├── AppLanguage.kt Idioma de la app (Sistema / Español / English)
-│           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
-│           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
-│           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
-│           └── VideoPane.kt   Vista del video del receptor
-│       └── video/UsbVideo.kt  Receptor FPV UVC por USB: permiso, apertura, grabación
-├── app/src/main/res/values*/  Textos: español (values) e inglés (values-en)
-├── app/src/main/assets/mapa/  Estilos del mapa (es/en), letras e íconos (y region.pmtiles, generado)
-├── tools/mapa/                Scripts para generar el mapa offline y su estilo
-├── firmware/esp32-bt-bridge/  Sketch Arduino del puente LoRa → Bluetooth
-└── docs/img/                  Capturas para este README
+│           ├── Dashboard.kt   Status bar, video/map swap, detections panel
+│           ├── MapPane.kt     MapLibre map: track, pins, operator and navigation layers
+│           ├── OfflineMap.kt  Local .pmtiles file, import/download and style
+│           ├── OnlineMap.kt   Online map and connectivity detection (automatic switch)
+│           ├── AppLanguage.kt App language (System / Español / English)
+│           ├── Panel.kt       Dashboard tab: indicators, charts and log
+│           ├── SearchDialogs.kt Search list and "New search"
+│           ├── Sensors.kt     Operator location and phone compass
+│           └── VideoPane.kt   Receiver video view
+├── app/src/main/res/values*/  Strings: Spanish (values) and English (values-en)
+├── app/src/main/assets/mapa/  Map styles (es/en), glyphs and icons (and region.pmtiles, generated)
+├── tools/mapa/                Scripts to build the offline map and its style
+├── firmware/esp32-bt-bridge/  Arduino sketch for the LoRa → Bluetooth bridge
+└── docs/img/                  Screenshots for this README
 ```
 
-**¿Por qué `core/` está separado?** Toda la lógica que no depende del teléfono (interpretar
-paquetes, contar pérdidas, decidir qué exportar) vive en un módulo Kotlin puro. Así:
-- se prueba en segundos sin emulador (`./gradlew :core:test`);
-- se puede reutilizar en una futura app de escritorio con Kotlin Multiplatform, que leería la
-  estación tierra por USB (YP-05) en lugar de Bluetooth.
+**Why is `core/` separate?** All the logic that does not depend on the phone (parsing packets,
+counting losses, deciding what to export) lives in a pure Kotlin module. That way:
+- it is tested in seconds without an emulator (`./gradlew :core:test`);
+- it can be reused in a future desktop app with Kotlin Multiplatform, which would read the
+  ground station over USB (YP-05) instead of Bluetooth.
 
-Para agregar un nuevo origen de datos, basta con implementar `LinkSource`:
+To add a new data source, just implement `LinkSource`:
 
 ```kotlin
 interface LinkSource {
     val label: String
-    fun lines(): Flow<String>   // una línea por paquete; termina o falla si se cae el enlace
+    fun lines(): Flow<String>   // one line per packet; completes or fails if the link drops
 }
 ```
 
-**Tecnologías:** Kotlin 2.4 · Jetpack Compose (Material 3) · Coroutines/StateFlow ·
-[UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (video USB) ·
+**Tech stack:** Kotlin 2.4 · Jetpack Compose (Material 3) · Coroutines/StateFlow ·
+[UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (USB video) ·
 [MapLibre Native](https://maplibre.org) + [PMTiles](https://protomaps.com) · Android Gradle Plugin 9 · minSdk 26 (Android 8.0).
 
-## Compilar e instalar
+## Build and install
 
-Requisitos: Android Studio reciente (con AGP 9) y JDK 17 o superior. El mapa incluido no se sube al
-repositorio por su tamaño: genéralo una vez con `tools/mapa/descargar_mapa.sh` (ver
-[Mapas sin internet](#mapas-sin-internet)). Si no lo generas, la app compila igual: arranca sin
-mapa base y puedes descargar uno desde la propia app.
+Requirements: a recent Android Studio (with AGP 9) and JDK 17 or newer. The bundled map is not
+committed because of its size: generate it once with `tools/mapa/descargar_mapa.sh` (see
+[Maps without internet](#maps-without-internet)). If you don't, the app still builds: it starts
+without a base map and you can download one from the app itself.
 
 ```bash
 git clone https://github.com/DaiYukichi/SAR-Response.git
 cd SAR-Response
-./gradlew :core:test           # pruebas del núcleo
-./gradlew :app:assembleDebug   # APK en app/build/outputs/apk/debug/
-./gradlew :app:installDebug    # instala en el teléfono conectado por USB
+./gradlew :core:test           # core tests
+./gradlew :app:assembleDebug   # APK in app/build/outputs/apk/debug/
+./gradlew :app:installDebug    # installs on the phone connected over USB
 ```
 
-O simplemente abre la carpeta en Android Studio y presiona *Run*.
+Or simply open the folder in Android Studio and press *Run*.
 
-## Estación tierra (ESP32)
+## Ground station (ESP32)
 
-El sketch [`firmware/esp32-bt-bridge`](firmware/esp32-bt-bridge/esp32-bt-bridge.ino) convierte
-un ESP32 en un puente: todo lo que recibe la E32 lo reenvía por Bluetooth al teléfono, y
-también por USB para depurar.
+The sketch [`firmware/esp32-bt-bridge`](firmware/esp32-bt-bridge/esp32-bt-bridge.ino) turns an
+ESP32 into a bridge: everything the E32 receives is forwarded over Bluetooth to the phone, and
+also over USB for debugging.
 
 | E32 | ESP32 |
 |---|---|
-| TXD | GPIO16 (RX2), configurable en el sketch |
-| RXD | sin conectar |
-| M0, M1 | GND (modo normal) |
+| TXD | GPIO16 (RX2), configurable in the sketch |
+| RXD | not connected |
+| M0, M1 | GND (normal mode) |
 | GND | GND |
 | VCC | 5 V |
 
-- Se necesita un ESP32 con **Bluetooth clásico** (ESP32-WROOM/WROVER). Los S2, S3 y C3 solo
-  tienen BLE y no sirven para este sketch.
-- Probado con el core ESP32 de Arduino 2.0.x.
-- La E32 de tierra debe estar en el **mismo canal y velocidad de aire** que la del payload
-  (en este proyecto: 915 MHz, 2.4 kbps, 9600 8N1).
-- Un adaptador USB-serie (p. ej. YP-05) puede escuchar en paralelo la misma línea TXD para
-  registrar en una PC. Solo un dispositivo debe manejar la línea RXD de la E32.
+- It needs an ESP32 with **classic Bluetooth** (ESP32-WROOM/WROVER). The S2, S3 and C3 only have
+  BLE and won't work with this sketch.
+- Tested with the Arduino ESP32 core 2.0.x.
+- The ground E32 must use the **same channel and air data rate** as the payload's (in this
+  project: 915 MHz, 2.4 kbps, 9600 8N1).
+- A USB-serial adapter (e.g. YP-05) can listen to the same TXD line in parallel to log on a PC.
+  Only one device should drive the E32's RXD line.
 
-## Mapas sin internet
+## Maps without internet
 
-El mapa es **vectorial**: datos de OpenStreetMap (vía [Protomaps](https://protomaps.com)) en
-formato `.pmtiles`, dibujados con [MapLibre](https://maplibre.org) con el mismo estilo oscuro en
-español, sea en línea u offline. Las letras y los íconos del mapa van dentro de la app.
+The map is **vector**: OpenStreetMap data (via [Protomaps](https://protomaps.com)) in `.pmtiles`
+format, rendered with [MapLibre](https://maplibre.org) with the same dark style, online or
+offline. Glyphs and map icons are bundled in the app.
 
-- **En línea (si hay internet y la opción está activa):** se lee el mapa base mundial directamente
-  de internet, pidiendo solo las teselas que se ven. La app vigila la conexión: si se pierde, pasa
-  al mapa offline; si vuelve, regresa al en línea. Abajo a la derecha del mapa se indica cuál se usa.
-- **Offline:** el mapa guardado en el teléfono. Fuera de la zona con detalle solo existe el mundo
-  general: si el mapa se ve vacío, alejarlo (o descargar esa zona antes de salir).
+- **Online (if there is internet and the option is on):** the global base map is read directly
+  from the internet, requesting only the visible tiles. The app watches the connection: if it is
+  lost, it switches to the offline map; when it comes back, it returns to the online one. The
+  bottom right of the map shows which one is in use.
+- **Offline:** the map stored on the phone. Outside the detailed area only the low-detail world
+  exists: if the map looks empty, zoom out (or download that area before leaving).
 
-- **Incluido:** el **mundo con poco detalle** (países, ciudades, carreteras principales; ~15 MB)
-  para ubicarse en cualquier parte, más **Chiriquí con detalle de calle** (~19 MB). Al primer
-  arranque se copia al almacenamiento interno; por eso la primera vez tarda unos segundos.
-- **Descargar otra zona desde la app (plug and play):** con internet, antes de salir,
-  **⚙ Ajustes → Descargar mapa de una zona (requiere internet)**. Mueves y acercas el mapa
-  hasta encuadrar la zona y tocas **Descargar esta zona**: la app baja **solo esa zona** con detalle
-  de calle (más el mundo general), con progreso y opción de cancelar. Si la zona es muy grande,
-  baja automáticamente el nivel de detalle para no pasar de ~90 MB.
-- **Importar:** **Importar mapa (.pmtiles)…** carga un archivo que ya esté en el teléfono.
-  **Volver al mapa incluido** deshace la descarga o importación.
-- **Sin ningún mapa:** la app sigue funcionando; recorrido, pines, distancias y navegación se
-  dibujan sobre un fondo liso.
+- **Bundled:** the **low-detail world** (countries, cities, main roads; ~15 MB) to find your way
+  anywhere, plus **Chiriquí with street detail** (~19 MB). On first launch it is copied to
+  internal storage, which is why the first launch takes a few seconds.
+- **Download another area from the app (plug and play):** with internet, before leaving,
+  **⚙ Settings → Download a map area (needs internet)**. Pan and zoom the map to frame the area
+  and tap **Download this area**: the app downloads **only that area** with street detail (plus
+  the low-detail world), with progress and a cancel option. If the area is very large, it lowers
+  the detail level automatically to stay under ~90 MB.
+- **Import:** **Import map (.pmtiles)…** loads a file already on the phone. **Back to the
+  bundled map** undoes the download or import.
+- **No map at all:** the app keeps working; track, pins, distances and navigation are drawn on a
+  plain background.
 
-### Cómo funciona la descarga
+### How the download works
 
-El mapa base diario de Protomaps es un único archivo PMTiles del planeta (~120 GB). La app no lo
-baja: lee su índice y pide por HTTP (`Range`) **solo los bytes de las teselas de la zona**, y arma
-con ellas un PMTiles nuevo y válido (`core/map/MapExtractor.kt`). Es el mismo resultado que
-`pmtiles extract`, verificado con `pmtiles verify` y con una prueba que compara tesela por tesela.
+Protomaps' daily base map is a single PMTiles file of the whole planet (~120 GB). The app does not
+download it: it reads its index and requests over HTTP (`Range`) **only the bytes of the tiles in
+the area**, and builds a new, valid PMTiles file from them (`core/map/MapExtractor.kt`). The
+result is the same as `pmtiles extract`, verified with `pmtiles verify` and with a test that
+compares tile by tile.
 
-> Se usan las builds públicas de `build.protomaps.com` (se guardan las de la última semana). Para
-> uso en producción conviene alojar una copia propia del mapa base y cambiar la URL.
-> No se usan los servidores de teselas de OpenStreetMap: su
-> [política](https://operations.osmfoundation.org/policies/tiles/) prohíbe las descargas masivas.
+> The public builds at `build.protomaps.com` are used (the last week's builds are kept). For
+> production use, host your own copy of the base map and change the URL.
+> OpenStreetMap's tile servers are not used: their
+> [policy](https://operations.osmfoundation.org/policies/tiles/) forbids bulk downloads.
 
-### Generar el mapa incluido (en la computadora)
+### Generating the bundled map (on the computer)
 
 ```bash
-tools/mapa/descargar_mapa.sh                              # mundo + Chiriquí (por defecto)
-tools/mapa/descargar_mapa.sh "-82.52,8.36,-82.35,8.50"    # mundo + otra zona: oeste,sur,este,norte
+tools/mapa/descargar_mapa.sh                              # world + Chiriquí (default)
+tools/mapa/descargar_mapa.sh "-82.52,8.36,-82.35,8.50"    # world + another area: west,south,east,north
 ```
 
-Usa el mismo recortador de la app (no requiere herramientas externas) y deja el resultado en
-`app/src/main/assets/mapa/region.pmtiles`, que se empaqueta al compilar. El estilo del mapa (tema
-oscuro, etiquetas en español) se genera con `cd tools/mapa && npm install && npm run estilo`.
+It uses the same extractor as the app (no external tools needed) and writes the result to
+`app/src/main/assets/mapa/region.pmtiles`, which is packaged at build time. The map style (dark
+theme, Spanish and English labels) is generated with
+`cd tools/mapa && npm install && npm run estilo`.
 
-## Modo demo
+## Demo mode
 
-En el selector de fuente, **Demo (misión simulada)** crea una búsqueda "Demo" con su área y reproduce
-una misión de unos 80 segundos:
+In **Connect ▾**, **Demo (simulated mission)** creates a "Demo" search with its area and replays
+a mission of about 80 seconds:
 
-- el dron barre el área en pasadas paralelas (patrón de "cortadora de césped"),
-- llegan latidos con posición y 4 detecciones con distintas confianzas,
-- se simula la pérdida de un paquete, que aparece en el contador de *perdidos*,
-- el operador queda en un punto de despegue simulado al suroeste del área, para que la
-  distancia, el rumbo y "Navegar a" funcionen sin GPS. La brújula sí es la real del teléfono.
+- the drone sweeps the area in parallel passes ("lawnmower" pattern),
+- heartbeats with position and battery arrive, plus 4 detections with different confidences,
+- a lost packet is simulated, which shows up in the *lost* counter,
+- the battery drains until a low-battery warning (`$SAB`) arrives,
+- the operator stays at a simulated take-off point south-west of the area, so distance, bearing
+  and "Navigate" work without GPS. The compass is the phone's real one.
 
-Sirve para entrenar a operadores, probar la interfaz y presentar el proyecto sin hardware.
-Las coordenadas de la demo son un punto genérico en David, Chiriquí (Panamá), y se pueden
-cambiar en `ReplaySource.kt`.
+It is useful to train operators, test the interface and present the project without hardware.
+The demo coordinates are a generic point in David, Chiriquí (Panama), and can be changed in
+`ReplaySource.kt`.
 
-## Permisos y privacidad
+## Permissions and privacy
 
-| Permiso | Para qué |
+| Permission | What for |
 |---|---|
-| Bluetooth (conectar) | Hablar con la estación tierra. |
-| Ubicación | Posición del operador: punto en el mapa, distancia y rumbo a cada detección y "Navegar a". Si se niega, todo lo demás funciona. |
-| Internet / estado de red | **Solo** para el mapa: verlo en línea cuando hay conexión (se puede apagar) y "Descargar mapa de una zona". Nada más usa la red: los datos del dron, las detecciones y las decisiones nunca salen del teléfono, y no hay servidores, cuentas ni analíticas. |
-| Cámara | **Solo** para leer el receptor de video USB: Android exige este permiso para abrir cualquier cámara USB. La app no usa las cámaras del teléfono. |
-| Vibración | Avisar de nuevas detecciones. |
+| Bluetooth (connect) | Talk to the ground station. |
+| Location | Operator position: dot on the map, distance and bearing to each detection, and "Navigate". If denied, everything else works. |
+| Internet / network state | **Only** for the map: show it online when there is a connection (can be turned off) and "Download a map area". Nothing else uses the network: drone data, detections and decisions never leave the phone, and there are no servers, accounts or analytics. |
+| Camera | **Only** to read the USB video receiver: Android requires this permission to open any USB camera. The app does not use the phone's cameras. |
+| Vibration | Alert about new detections. |
 
-- **Sin internet en campo, por diseño.** Ninguna función de la operación depende de la red. Internet
-  solo se usa para mostrar o descargar el **mapa**; las detecciones y las posiciones no se envían a
-  ningún lado.
-- **Todo se queda en el teléfono.** La app no tiene servidor, cuentas, analíticas ni
-  publicidad. Los datos solo salen si el operador exporta un GPX o comparte una detección.
-- **El payload no transmite imágenes de personas por LoRa**, solo coordenadas, confianza y hora.
-- **Decisión humana obligatoria.** La app nunca trata una detección como confirmada por sí
-  sola. Cada confirmación o descarte guarda su hora para poder revisar la operación después.
+Video recordings are saved to Movies/SAR without asking for a storage permission (Android 10+).
 
-## Decisiones de diseño
+- **No internet in the field, by design.** No operational feature depends on the network. The
+  internet is only used to show or download the **map**; detections and positions are not sent
+  anywhere.
+- **Everything stays on the phone.** The app has no server, accounts, analytics or ads. Data
+  only leaves if the operator exports a GPX/CSV or shares a detection.
+- **The payload does not send images of people over LoRa**, only coordinates, confidence and
+  time.
+- **A human decision is mandatory.** The app never treats a detection as confirmed on its own.
+  Every confirmation or dismissal stores its time so the operation can be reviewed later.
 
-- **Bluetooth clásico (SPP) en vez de BLE:** es el camino más simple y robusto para un flujo
-  de texto línea a línea desde un ESP32. BLE queda como opción si en el futuro hay app de iOS.
-- **Video analógico en vez de digital:** latencia de pocos milisegundos y degradación
-  gradual (con nieve en la imagen) en vez de congelarse.
-- **Texto legible en vez de binario:** los paquetes se pueden leer con cualquier terminal
-  serie, lo que facilita depurar en campo. Caben igual en un envío de la E32.
-- **Interfaz oscura y de alto contraste:** se lee mejor al sol y gasta menos batería en
-  pantallas OLED.
-- **La lista nunca se mueve bajo el dedo:** confirmar o descartar la tarjeta equivocada en una
-  búsqueda real es grave, así que se evita el desplazamiento automático y se bloquean los botones
-  un instante tras cada reordenamiento.
-- **Compartir como texto plano:** lo entiende cualquier persona en cualquier app, incluso sin
-  SAR-Response instalada.
-- **Recortar el mapa nosotros mismos:** descargar solo los bytes de la zona (en vez de un
-  archivo por país preparado de antemano) permite bajar *cualquier* zona del mundo sin servidor
-  propio, y unir "mundo general + detalle" en un solo archivo.
-- **Mapa vectorial en vez de imágenes:** Chiriquí entero pesa ~20 MB, se ve nítido a cualquier
-  zoom y los nombres se pueden mostrar en español.
-- **Mapa y video siempre montados:** al intercambiarlos solo cambia su tamaño, así el mapa no
-  se recarga ni pierde el zoom.
+## Design decisions
 
-## Limitaciones conocidas
+- **Classic Bluetooth (SPP) instead of BLE:** the simplest and most robust path for a
+  line-by-line text stream from an ESP32. BLE remains an option if there is an iOS app in the
+  future.
+- **Analog instead of digital video:** latency of a few milliseconds and graceful degradation
+  (snow in the image) instead of freezing.
+- **Readable text instead of binary:** packets can be read with any serial terminal, which makes
+  field debugging easier. They still fit in one E32 transmission.
+- **Dark, high-contrast interface:** easier to read in the sun and uses less battery on OLED
+  screens.
+- **The list never moves under the finger:** confirming or dismissing the wrong card in a real
+  search is serious, so auto-scrolling is avoided and buttons are locked for an instant after
+  every reorder.
+- **Share as plain text:** anyone understands it in any app, even without SAR-Response installed.
+- **Extracting the map ourselves:** downloading only the bytes of the area (instead of a
+  pre-built per-country file) makes it possible to download *any* area of the world without our
+  own server, and to merge "low-detail world + detail" into one file.
+- **Vector map instead of images:** all of Chiriquí weighs ~20 MB, looks sharp at any zoom and
+  labels can be shown in Spanish or English.
+- **Map and video always mounted:** swapping them only changes their size, so the map does not
+  reload or lose its zoom.
 
-- Receptor usado: "RXC FPV receiver" 5.8 GHz (chip MacroSilicon), salida UVC MJPEG 1920×1080;
-  probado en un POCO con Android 16. **La grabación todavía no se probó con el receptor real.**
-- El video grabado no tiene marcas de tiempo por detección: para cruzarlo con las detecciones se
-  usa la hora de inicio del archivo y la hora de cada detección del CSV.
-- El % de área cubierta es una estimación: depende del ancho de barrido que ingresa el operador.
-- La posición de una detección es la del GPS del **dron** en ese momento, no la proyección
-  exacta del píxel al suelo. A 40–60 m de altura el error puede ser de varios metros.
-- La brújula del teléfono indica el norte **magnético**; la diferencia con el norte geográfico
-  es pequeña en Panamá (unos 2°), pero en otras regiones puede ser mayor. Además, las brújulas de
-  los teléfonos se descalibran cerca de metales: si la flecha no tiene sentido, haz un "8" con el
-  teléfono.
-- El mapa incluido tiene detalle hasta nivel de calle (zoom 15); más cerca se amplía el mismo
-  detalle. No incluye imágenes satelitales.
-- El APK de depuración pesa ~80 MB porque incluye el mapa y el motor de mapas para todos los
-  tipos de procesador; una versión de publicación por procesador pesa bastante menos.
-- La distancia y el rumbo son en línea recta; no consideran el terreno ni los caminos.
-- La app asume una sola estación tierra a la vez.
+## Known limitations
 
-## Trabajo futuro
+- Receiver used: "RXC FPV receiver" 5.8 GHz (MacroSilicon chip), UVC MJPEG 1920×1080 output;
+  tested on a POCO phone with Android 16. **Recording has not been tested with the real receiver
+  yet.**
+- The recorded video has no per-detection timestamps: to match it with the detections, use the
+  file's start time and each detection's time from the CSV.
+- The % of area covered is an estimate: it depends on the planned altitude entered by the
+  operator (the real altitude is not in the heartbeat yet).
+- A detection's position is the **drone's** GPS position at that moment, not the exact
+  projection of the pixel onto the ground. At 40–60 m altitude the error can be several meters.
+- The phone's compass points to **magnetic** north; the difference from true north is small in
+  Panama (about 2°) but may be larger elsewhere. Phone compasses also lose calibration near
+  metal: if the arrow makes no sense, move the phone in a figure "8".
+- The bundled map has street-level detail (zoom 15); closer in, the same detail is magnified. It
+  does not include satellite imagery.
+- The debug APK weighs ~80 MB because it includes the map and the map engine for every processor
+  type; a per-processor release build is much smaller.
+- Distance and bearing are in a straight line; they do not take terrain or trails into account.
+- The app assumes a single ground station at a time.
 
-La app actual cubre el ciclo completo **detectar → verificar → decidir → guiar**. Lo que sigue
-está diseñado (parte de ello en un mockup interactivo), pero **todavía no se puede implementar**
-porque depende de hardware o radios que el prototipo no tiene. Se documenta aquí como la
-dirección del proyecto.
+## Future work
 
-### A corto plazo (solo software)
+The current app covers the full cycle **detect → verify → decide → guide**. What follows is
+designed (part of it in an interactive mockup), but **cannot be implemented yet** because it
+depends on hardware or radios the prototype does not have. It is documented here as the
+project's direction.
 
-- [x] ~~Video 5.8 GHz dentro de la app con el receptor UVC por OTG~~ (hecho y probado con el
-      receptor real).
-- [x] ~~Grabar el video de la misión~~ (hecho: MP4 en Movies/SAR).
-- [ ] Marcar las detecciones dentro del video grabado (capítulos o subtítulos con la hora de cada
-      una) y reproducirlo en la app junto al mapa.
-- [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
-- [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
-- [x] ~~Usar el modo 4:3 con el sensor completo de la OV5647~~ (hecho: 1280×960, FOV 53,5°).
-- [ ] Alojar una copia propia del mapa base para las descargas, en vez de las builds públicas.
-- [ ] **Altura real en vuelo:** agregar la altura relativa al despegue al latido `$SAH` (GPS o
-      barómetro) para que la cobertura use la altura medida y no la planificada.
-- [ ] **Recall según tamaño en píxeles** a partir de la evaluación del modelo en la K230, para que
-      el umbral de altura salga de datos propios y no de un valor supuesto.
-- [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
-- [ ] **Tema claro** como alternativa al oscuro.
-- [ ] Varios drones a la vez (campo `unidad`) con colores distintos.
-- [x] ~~Traducción al inglés~~ (hecho: interfaz, mapa, compartir, CSV y GPX).
-- [ ] **App de escritorio** con Kotlin Multiplatform reutilizando `core/` y la estación tierra por USB.
+### Short term (software only)
 
-### Red de rescate en campo (requiere nuevo hardware)
+- [x] ~~5.8 GHz video inside the app with the UVC receiver over OTG~~ (done and tested with the
+      real receiver).
+- [x] ~~Record the mission video~~ (done: MP4 in Movies/SAR).
+- [ ] Mark the detections inside the recorded video (chapters or subtitles with each one's time)
+      and play it back in the app next to the map.
+- [x] ~~Separate, bounded searches saved on the phone~~ (done).
+- [ ] View a previous search in read-only mode (today, opening it resumes it).
+- [x] ~~Use the OV5647's 4:3 full-sensor mode~~ (done: 1280×960, FOV 53.5°).
+- [ ] Host our own copy of the base map for downloads, instead of the public builds.
+- [ ] **Real in-flight altitude:** add the altitude above take-off to the `$SAH` heartbeat (GPS
+      or barometer) so coverage uses the measured altitude rather than the planned one.
+- [ ] **Recall by pixel size** from the model's evaluation on the K230, so the altitude threshold
+      comes from our own data instead of an assumed value.
+- [ ] **Notes per detection** (e.g. "injured person", "needs a stretcher").
+- [ ] **Light theme** as an alternative to the dark one.
+- [ ] Several drones at once (`unit` field) with different colors.
+- [x] ~~English translation~~ (done: interface, map, sharing, CSV and GPX).
+- [ ] **Desktop app** with Kotlin Multiplatform reusing `core/` and the ground station over USB.
 
-La idea es que el sistema no termine en el teléfono del operador, sino que llegue hasta quien
-camina hacia la víctima.
+### Field rescue network (needs new hardware)
 
-- [ ] **SAR-Beacon, la vista del rescatista:** un nodo de mano (ESP32 + E32 + GPS + pantalla)
-      que muestra una flecha, la distancia y el rumbo hacia la detección que el operador le
-      asignó, con un botón **"Voy en camino"**.
-- [ ] **Enviar al equipo de tierra por radio:** desde una detección confirmada, el operador
-      asigna el objetivo a un rescatista concreto, sin depender de datos móviles.
-- [ ] **Nodos multi-rol:** el mismo firmware cumple distintos papeles según su identificador:
-      `A#` dron · `G#` tierra / rescatista · `R#` repetidor.
-- [ ] **Emparejamiento por QR** entre la app y cada nodo.
-- [ ] **Nuevos paquetes** en el mismo formato de texto con checksum:
-      - `$SAG` *go-to*: el operador asigna un objetivo a un rescatista.
-      - `$SGP` posición periódica del rescatista (aparece en el mapa del operador).
-      - `$SGA` confirmación (*ack*) de que el rescatista recibió la orden.
-- [ ] **Malla por inundación (*flooding*)** para cubrir quebradas y laderas sin línea de vista:
-      cada paquete lleva origen, secuencia y TTL; los nodos descartan duplicados y los
-      repetidores (`R#`) retransmiten.
+The idea is that the system does not end at the operator's phone, but reaches whoever is walking
+toward the victim.
 
-### Mejoras de precisión
+- [ ] **SAR-Beacon, the rescuer's view:** a handheld node (ESP32 + E32 + GPS + display) that
+      shows an arrow, the distance and the bearing to the detection the operator assigned to it,
+      with an **"On my way"** button.
+- [ ] **Send to the ground team by radio:** from a confirmed detection, the operator assigns the
+      target to a specific rescuer, without relying on mobile data.
+- [ ] **Multi-role nodes:** the same firmware plays different roles depending on its identifier:
+      `A#` drone · `G#` ground / rescuer · `R#` repeater.
+- [ ] **QR pairing** between the app and each node.
+- [ ] **New packets** in the same text format with checksum:
+      - `$SAG` *go-to*: the operator assigns a target to a rescuer.
+      - `$SGP` periodic rescuer position (shown on the operator's map).
+      - `$SGA` acknowledgment that the rescuer received the order.
+- [ ] **Flooding mesh** to cover ravines and slopes without line of sight: each packet carries
+      origin, sequence and TTL; nodes drop duplicates and repeaters (`R#`) retransmit.
 
-- [ ] Proyectar la detección al suelo usando la altura del dron y la orientación de la cámara,
-      en vez de usar la posición del dron.
-- [ ] Corregir la declinación magnética de la brújula.
-- [ ] Rutas a pie sobre el terreno (curvas de nivel, senderos) en vez de línea recta.
+### Accuracy improvements
 
-## Contribuir
+- [ ] Project the detection onto the ground using the drone's altitude and the camera's
+      orientation, instead of using the drone's position.
+- [ ] Correct the compass's magnetic declination.
+- [ ] Walking routes over the terrain (contour lines, trails) instead of a straight line.
 
-Se aceptan *issues* y *pull requests*. Si cambias algo en `core/`, agrega o actualiza las
-pruebas y verifica que `./gradlew :core:test` pase. Si cambias el protocolo, actualiza
-también el firmware del payload y la sección [Protocolo](#protocolo-de-los-paquetes-lora).
+## Contributing
 
-## Licencia
+Issues and pull requests are welcome. If you change anything in `core/`, add or update the tests
+and make sure `./gradlew :core:test` passes. If you change the protocol, also update the payload
+firmware and the [Protocol](#lora-packet-protocol) section (in both READMEs).
 
-Código bajo licencia [Apache-2.0](LICENSE).
+## License
 
-- Datos de mapas © [colaboradores de OpenStreetMap](https://www.openstreetmap.org/copyright),
-  licencia ODbL, procesados por [Protomaps](https://protomaps.com).
-- Video USB: [UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (Apache-2.0), que incluye
-  libuvc (BSD), libusb (LGPL-2.1, enlazada dinámicamente) y libjpeg-turbo (BSD/IJG).
-- Letras Noto Sans: [SIL Open Font License](app/src/main/assets/mapa/licencias/fuentes-OFL.txt).
-- Ícono de la app, pantalla de arranque y logo: diseño "Baliza", "Radar" y "Monocromática"
-  generado con Dia para este proyecto.
-- Íconos del mapa: derivados de [tangrams/icons](https://github.com/tangrams/icons), licencia
-  [MIT](app/src/main/assets/mapa/licencias/iconos-MIT.md).
+Code under the [Apache-2.0](LICENSE) license.
+
+- Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), ODbL
+  license, processed by [Protomaps](https://protomaps.com).
+- USB video: [UVCAndroid](https://github.com/shiyinghan/UVCAndroid) (Apache-2.0), which includes
+  libuvc (BSD), libusb (LGPL-2.1, dynamically linked) and libjpeg-turbo (BSD/IJG).
+- Noto Sans glyphs: [SIL Open Font License](app/src/main/assets/mapa/licencias/fuentes-OFL.txt).
+- App icon, splash screen and logo: "Baliza", "Radar" and "Monocromática" designs generated with
+  Dia for this project.
+- Map icons: derived from [tangrams/icons](https://github.com/tangrams/icons),
+  [MIT](app/src/main/assets/mapa/licencias/iconos-MIT.md) license.

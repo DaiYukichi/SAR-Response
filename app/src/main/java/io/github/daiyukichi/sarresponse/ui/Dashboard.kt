@@ -101,7 +101,8 @@ private val AreaColor = Color(0xFF2DD4BF)
 private const val REORDER_GUARD_MS = 800L
 
 /** El payload manda latido cada 30 s; más de dos latidos sin nada = enlace LoRa caído. */
-private const val HEARTBEAT_MS = 30_000L
+/** Cada cuánto manda el payload su latido $SAH (sar_payload.py: HEARTBEAT_S = 10). */
+private const val HEARTBEAT_MS = 10_000L
 
 @Composable
 fun DashboardScreen(
