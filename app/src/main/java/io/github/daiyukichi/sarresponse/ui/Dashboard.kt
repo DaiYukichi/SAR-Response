@@ -1049,9 +1049,14 @@ private fun confidenceColor(c: Double) = when {
 fun formatDistance(meters: Double): String =
     if (meters < 1000) "${meters.roundToInt()} m" else String.format(Locale.ROOT, "%.1f km", meters / 1000)
 
+/** Corto para que entre en la pastilla del encabezado ("hace 11 min 25 s" se cortaba). */
 private fun formatAge(ms: Long): String {
     val s = ms / 1000
-    return if (s < 60) "$s s" else "${s / 60} min ${s % 60} s"
+    return when {
+        s < 60 -> "$s s"
+        s < 3600 -> "${s / 60} min"
+        else -> "${s / 3600} h"
+    }
 }
 
 fun formatUtc(hhmmss: String) =

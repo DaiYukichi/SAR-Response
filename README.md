@@ -22,12 +22,12 @@ where someone was detected, watch the video, decide** whether the detection is r
 **guide the people on foot** to that person.
 
 <p align="center">
-  <img src="docs/img/mapa.png" width="300" alt="Operation view: search area, drone track, pending, confirmed and dismissed detections">
+  <img src="docs/img/mapa-en.png" width="300" alt="Operation view: search area, drone track, pending, confirmed and dismissed detections">
   &nbsp;&nbsp;
-  <img src="docs/img/panel.png" width="300" alt="Dashboard: area coverage, mission time, payload battery and low-battery warning">
+  <img src="docs/img/panel-en.png" width="300" alt="Dashboard: area coverage, mission time, payload battery and low-battery warning">
 </p>
 
-<p align="center"><sub>Screenshots taken with the simulated mission (demo mode), app in Spanish. Map data © OpenStreetMap contributors.</sub></p>
+<p align="center"><sub>Screenshots taken with the simulated mission (demo mode). Map data © OpenStreetMap contributors.</sub></p>
 
 ---
 
