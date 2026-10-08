@@ -640,12 +640,15 @@ private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
 @Composable
 private fun SettingsButton(onClick: () -> Unit) {
     Surface(
-        shape = CircleShape,
+        shape = RoundedCornerShape(50),
         color = Faint.copy(alpha = 0.15f),
         border = BorderStroke(1.dp, Faint.copy(alpha = 0.45f)),
-        modifier = Modifier.clip(CircleShape).clickable(onClickLabel = stringResource(R.string.settings_title), onClick = onClick),
+        modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onClick),
     ) {
-        Text("⚙", color = Ink, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+        Text(
+            "⚙ " + stringResource(R.string.settings_title), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            maxLines = 1, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        )
     }
 }
 
