@@ -91,7 +91,7 @@
     <string name="p_lowbat_alerts">Low-battery alerts</string>
     <string name="p_alert_active">alert active!</string>
     <string name="p_threshold">threshold %1$s V</string>
-    <string name="p_coverage_note">Coverage is an estimate from the planned altitude and the camera FOV (41° by default: Pi v1.3 camera at 1080p; confirm by measuring).</string>
+    <string name="p_coverage_note">Coverage is an estimate from the planned altitude and the camera FOV (53.5° by default: Pi v1.3 camera at 1280×960, full sensor).</string>
     <string name="p_no_active_search">No active search</string>
     <string name="p_create_from_bar">Create a search from the bar above to record the mission.</string>
     <string name="p_no_area">This search has no area. Create one with an area to see coverage.</string>
@@ -149,7 +149,7 @@
     <string name="swath_line">Swath: %1$d m wide per pass</string>
     <string name="px_line">Person lying down ≈ %1$d px %2$s · standing, seen from above ≈ %3$d px %4$s</string>
     <string name="too_high">Too high: a person would take too few pixels for the model to detect them well. Fly at %1$d m or lower.</string>
-    <string name="fov_note">Default FOV: 41°, Pi v1.3 camera (OV5647) in 1080p mode, which crops the sensor (with the full sensor in 4:3 it would be 53.5°). To confirm it: camera 2 m from a wall, measure the width W (in m) fully visible and use FOV = 2·atan(W/4).</string>
+    <string name="fov_note">Default FOV: 53.5°, Pi v1.3 camera (OV5647) in 1280×960 mode with the full sensor. If you change mode or lens: To confirm it: camera 2 m from a wall, measure the width W (in m) fully visible and use FOV = 2·atan(W/4).</string>
     <string name="draw_later">Next you can draw the area by tapping its corners on the map (works without internet).</string>
     <string name="draw_area">Draw area</string>
     <string name="no_area">No area</string>

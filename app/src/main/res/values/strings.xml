@@ -92,7 +92,7 @@
     <string name="p_lowbat_alerts">Avisos batería baja</string>
     <string name="p_alert_active">¡aviso vigente!</string>
     <string name="p_threshold">umbral %1$s V</string>
-    <string name="p_coverage_note">La cobertura es una estimación con la altura planificada y el FOV de la cámara (41° por defecto: cámara Pi v1.3 en 1080p; confirmar midiendo).</string>
+    <string name="p_coverage_note">La cobertura es una estimación con la altura planificada y el FOV de la cámara (53,5° por defecto: cámara Pi v1.3 en 1280×960, sensor completo).</string>
     <string name="p_no_active_search">Sin búsqueda activa</string>
     <string name="p_create_from_bar">Crea una búsqueda desde la barra de arriba para registrar la misión.</string>
     <string name="p_no_area">Esta búsqueda no tiene área. Crea una con área para ver la cobertura.</string>
@@ -150,7 +150,7 @@
     <string name="swath_line">Barrido: %1$d m de ancho por pasada</string>
     <string name="px_line">Persona acostada ≈ %1$d px %2$s · de pie vista desde arriba ≈ %3$d px %4$s</string>
     <string name="too_high">Demasiado alto: una persona ocuparía muy pocos píxeles para que el modelo la detecte bien. Baja a %1$d m o menos.</string>
-    <string name="fov_note">FOV por defecto: 41°, cámara Pi v1.3 (OV5647) en modo 1080p, que recorta el sensor (con el sensor completo en 4:3 serían 53,5°). Para confirmarlo: cámara a 2 m de una pared, mide el ancho W (en m) que se ve completo y usa FOV = 2·atan(W/4).</string>
+    <string name="fov_note">FOV por defecto: 53,5°, cámara Pi v1.3 (OV5647) en modo 1280×960 con el sensor completo. Si cambias de modo o de lente: Para confirmarlo: cámara a 2 m de una pared, mide el ancho W (en m) que se ve completo y usa FOV = 2·atan(W/4).</string>
     <string name="draw_later">Después podrás dibujar el área tocando sus esquinas en el mapa (funciona sin internet).</string>
     <string name="draw_area">Dibujar área</string>
     <string name="no_area">Sin área</string>

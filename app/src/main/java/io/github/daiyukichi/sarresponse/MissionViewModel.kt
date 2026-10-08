@@ -201,8 +201,8 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         _demoOperator.value = demo.operatorPosition
         viewModelScope.launch {
             // La demo crea su propia búsqueda, con un área alrededor del barrido simulado.
-            // 36 m de altura con el FOV provisional ≈ 50 m de barrido, igual a la separación de pasadas.
-            activate(newSearch(getApplication<Application>().getString(R.string.source_demo) + " " + timeLabel(), SearchArea.rectangle(demo.center, 280.0, 330.0), 36.0, CameraGeometry.DEFAULT_HFOV_DEGREES))
+            // 50 m de altura con 53,5° de FOV ≈ 50 m de barrido, igual a la separación de pasadas.
+            activate(newSearch(getApplication<Application>().getString(R.string.source_demo) + " " + timeLabel(), SearchArea.rectangle(demo.center, 280.0, 330.0), 50.0, CameraGeometry.DEFAULT_HFOV_DEGREES))
             connect(demo, reconnect = false)
         }
     }

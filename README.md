@@ -198,11 +198,10 @@ altura constante.
 **Altura, barrido y tamaño de la persona.** Con la cámara hacia abajo, el ancho de terreno visto es
 `2 × altura × tan(FOV/2)`. El modelo recibe la imagen reducida a 640 px de ancho, así que una persona
 de tamaño `s` ocupa `s × 640 / barrido` píxeles. El modelo se entrenó con personas de unos 13×16 px;
-por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV por defecto es 41°**: la cámara
-del payload es la Raspberry Pi v1.3 (OV5647, módulo P5V04A) y en modo 1920×1080 recorta el centro
-del sensor (53,5° del sensor completo × 1920/2592 ≈ 41°). Para confirmarlo: a 2 m de una pared,
-medir el ancho `W` visible y usar `FOV = 2·atan(W/4)`. La **batería del payload** no se muestra todavía porque el protocolo no la trae
-([trabajo futuro](#trabajo-futuro)).
+por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV por defecto es 53,5°**: la cámara
+del payload es la Raspberry Pi v1.3 (OV5647, módulo P5V04A) en modo **1280×960**, que usa el sensor
+completo (53,5° × 41,4°). Si se cambia de modo o de lente, se mide: a 2 m de una pared, ancho `W`
+visible y `FOV = 2·atan(W/4)`.
 
 ### Panel de detecciones (abajo)
 
@@ -526,9 +525,7 @@ dirección del proyecto.
       una) y reproducirlo en la app junto al mapa.
 - [x] ~~Búsquedas separadas y delimitadas, guardadas en el teléfono~~ (hecho).
 - [ ] Ver una búsqueda anterior en modo solo lectura (hoy, abrirla la retoma).
-- [ ] **Medir el FOV real** de la cámara del payload (hoy 41°, calculado del modo 1080p de la OV5647).
-- [ ] Usar un modo 4:3 con el sensor completo (≈53,5° × 41,4°): aprovecha 75 % de la entrada de
-      640×640 del modelo en vez de 56 % y cubre más terreno por pasada.
+- [x] ~~Usar el modo 4:3 con el sensor completo de la OV5647~~ (hecho: 1280×960, FOV 53,5°).
 - [ ] Alojar una copia propia del mapa base para las descargas, en vez de las builds públicas.
 - [ ] **Altura real en vuelo:** agregar la altura relativa al despegue al latido `$SAH` (GPS o
       barómetro) para que la cobertura use la altura medida y no la planificada.
