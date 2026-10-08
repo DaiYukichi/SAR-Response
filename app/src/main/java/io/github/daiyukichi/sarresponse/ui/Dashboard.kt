@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ import androidx.compose.ui.zIndex
 import io.github.daiyukichi.sarresponse.LinkState
 import io.github.daiyukichi.sarresponse.LinkStatus
 import io.github.daiyukichi.sarresponse.MapDownload
+import io.github.daiyukichi.sarresponse.R
 import io.github.daiyukichi.sarresponse.core.Alert
 import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.Geo
@@ -70,6 +72,7 @@ import io.github.daiyukichi.sarresponse.core.MissionState
 import io.github.daiyukichi.sarresponse.core.PacketCodec
 import io.github.daiyukichi.sarresponse.core.Search
 import io.github.daiyukichi.sarresponse.core.SearchArea
+import io.github.daiyukichi.sarresponse.core.map.MapExtractor
 import io.github.daiyukichi.sarresponse.core.map.MapRegion
 import io.github.daiyukichi.sarresponse.video.UsbVideo
 import java.util.Locale
@@ -224,7 +227,7 @@ fun DashboardScreen(
                         }
                     } else {
                         Text(
-                            if (mapIsMain) "▣ Mostrar video" else "▣ Mostrar mapa",
+                            stringResource(if (mapIsMain) R.string.pip_show_video else R.string.pip_show_map),
                             color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
@@ -265,7 +268,7 @@ fun DashboardScreen(
                             modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp).zIndex(6f),
                         ) {
                             Text(
-                                "⚠ El dron está FUERA del área de búsqueda",
+                                stringResource(R.string.drone_outside),
                                 color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                             )
@@ -366,30 +369,35 @@ private fun StatusHeader(
                     age < 2 * HEARTBEAT_MS + 5_000 -> Warn
                     else -> Danger
                 }
-                Pill("ENLACE LORA", loraColor, if (age == null) "sin datos" else "hace ${formatAge(age)}", Modifier.weight(1f))
+                Pill(
+                    stringResource(R.string.pill_lora), loraColor,
+                    if (age == null) stringResource(R.string.no_data) else stringResource(R.string.ago, formatAge(age)),
+                    Modifier.weight(1f),
+                )
 
                 val hb = mission.lastHeartbeat
                 val fix = hb?.position != null
                 Pill(
-                    "GPS PAYLOAD",
+                    stringResource(R.string.pill_gps),
                     if (hb == null) Faint else if (fix) Ok else Warn,
-                    if (hb == null) "sin datos" else "${if (fix) "fix" else "sin fix"} · ${hb.satellites} sat",
+                    if (hb == null) stringResource(R.string.no_data)
+                    else stringResource(if (fix) R.string.gps_fix else R.string.gps_nofix, hb.satellites),
                     Modifier.weight(1.2f),
                 )
 
                 val v = mission.batteryVolts
                 Pill(
-                    "BATERÍA",
+                    stringResource(R.string.pill_battery),
                     batteryColor(v, mission.lowBatteryActive),
-                    v?.let { String.format(Locale.ROOT, "%.1f V", it) } ?: "sin dato",
+                    v?.let { String.format(Locale.ROOT, "%.1f V", it) } ?: stringResource(R.string.no_data),
                     Modifier.weight(0.8f),
                 )
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Counter(Ok, "Recibidos", mission.received)
-                Counter(Warn, "Perdidos", mission.lost)
-                Counter(Danger, "Corruptos", mission.corrupt)
+                Counter(Ok, stringResource(R.string.counter_received), mission.received)
+                Counter(Warn, stringResource(R.string.counter_lost), mission.lost)
+                Counter(Danger, stringResource(R.string.counter_corrupt), mission.corrupt)
             }
         }
     }
@@ -411,13 +419,13 @@ private fun LowBatteryBanner(volts: Double, onDismiss: () -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                "⚠ BATERÍA BAJA DEL PAYLOAD: ${String.format(Locale.ROOT, "%.2f", volts)} V",
+                stringResource(R.string.lowbat_title, String.format(Locale.ROOT, "%.2f", volts)),
                 color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp,
             )
-            Text("Aterriza pronto y cambia la batería.", color = Color.White.copy(alpha = 0.9f), fontSize = 11.5.sp)
+            Text(stringResource(R.string.lowbat_body), color = Color.White.copy(alpha = 0.9f), fontSize = 11.5.sp)
         }
         Text(
-            "Entendido", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+            stringResource(R.string.got_it), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.White.copy(alpha = 0.2f))
@@ -440,10 +448,10 @@ private fun SearchChip(search: Search?, onClick: () -> Unit) {
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("BÚSQUEDA", color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+        Text(stringResource(R.string.search_label), color = Faint, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
         Spacer(Modifier.width(8.dp))
         Text(
-            search?.name ?: "Ninguna · toca para crear una",
+            search?.name ?: stringResource(R.string.search_none),
             color = if (search == null) Warn else Ink,
             fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
             modifier = Modifier.weight(1f),
@@ -473,29 +481,28 @@ private fun DraftBanner(
             .border(1.5.dp, AreaColor, RoundedCornerShape(14.dp))
             .padding(12.dp),
     ) {
-        Text("Dibuja el área de búsqueda", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(stringResource(R.string.draft_title), color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         val info = when {
-            vertices.isEmpty() -> "Toca el mapa para marcar cada esquina del área."
-            vertices.size < 3 -> "${vertices.size} punto(s). Faltan ${3 - vertices.size} como mínimo."
-            else -> "${vertices.size} puntos · " +
-                formatArea(io.github.daiyukichi.sarresponse.core.SearchArea(vertices).areaSquareMeters)
+            vertices.isEmpty() -> stringResource(R.string.draft_empty)
+            vertices.size < 3 -> stringResource(R.string.draft_few, vertices.size, 3 - vertices.size)
+            else -> stringResource(R.string.draft_points, vertices.size, formatArea(SearchArea(vertices).areaSquareMeters))
         }
         Text(info, color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(
                 onClick = onCancel, border = BorderStroke(1.dp, Line),
                 contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
-            ) { Text("Cancelar", color = Muted, fontSize = 12.sp) }
+            ) { Text(stringResource(R.string.cancel), color = Muted, fontSize = 12.sp) }
             OutlinedButton(
                 onClick = onUndo, enabled = vertices.isNotEmpty(), border = BorderStroke(1.dp, Line),
                 contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
-            ) { Text("Deshacer", color = Muted, fontSize = 12.sp) }
+            ) { Text(stringResource(R.string.undo), color = Muted, fontSize = 12.sp) }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = onConfirm, enabled = vertices.size >= 3,
                 colors = ButtonDefaults.buttonColors(containerColor = AreaColor, contentColor = Color(0xFF042F2A)),
                 contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(36.dp),
-            ) { Text("Crear búsqueda", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            ) { Text(stringResource(R.string.create_search), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
         }
     }
 }
@@ -521,16 +528,17 @@ private fun MapAreaBanner(
             .border(1.5.dp, Primary, RoundedCornerShape(14.dp))
             .padding(12.dp),
     ) {
-        Text("Descargar mapa offline", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(stringResource(R.string.mapdl_title), color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         Text(
-            "Mueve y acerca el mapa hasta encuadrar la zona de la búsqueda. Se baja con detalle de calle, " +
-                "más el mundo con poco detalle. Necesita internet (solo ahora); en campo funciona sin él.",
+            stringResource(R.string.mapdl_body),
             color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp),
         )
         if (region != null) {
             Text(
-                "Detalle hasta zoom ${region.maxZoom}" + (if (region.maxZoom < 15) " (zona grande: menos detalle)" else "") +
-                    " · ≈ ${region.estimatedMegabytes().roundToInt() + 15} MB",
+                stringResource(
+                    if (region.maxZoom < 15) R.string.mapdl_detail_large else R.string.mapdl_detail,
+                    region.maxZoom, region.estimatedMegabytes().roundToInt() + 15,
+                ),
                 color = Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -538,13 +546,13 @@ private fun MapAreaBanner(
             OutlinedButton(
                 onClick = onCancel, border = BorderStroke(1.dp, Line),
                 contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.height(36.dp),
-            ) { Text("Cancelar", color = Muted, fontSize = 12.sp) }
+            ) { Text(stringResource(R.string.cancel), color = Muted, fontSize = 12.sp) }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = { region?.let(onConfirm) }, enabled = region != null,
                 colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = Color(0xFF001227)),
                 contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(36.dp),
-            ) { Text("Descargar esta zona", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            ) { Text(stringResource(R.string.mapdl_confirm), fontWeight = FontWeight.Bold, fontSize = 12.sp) }
         }
     }
 }
@@ -561,15 +569,21 @@ private fun MapDownloadBanner(state: MapDownload, onCancel: () -> Unit, onDismis
     ) {
         Text(
             when {
-                state.error != null -> "No se pudo descargar el mapa"
-                state.finished -> "Mapa offline listo"
-                else -> "Descargando mapa offline…"
+                state.error != null -> stringResource(R.string.mapdl_failed)
+                state.finished -> stringResource(R.string.mapdl_ready)
+                else -> stringResource(R.string.mapdl_running)
             },
             color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp,
         )
         Text(
-            state.error ?: if (state.finished) "Ya puedes usarlo sin internet." else
-                state.stage + (state.fraction?.let { " · ${(it * 100).roundToInt()} %" } ?: ""),
+            state.error ?: if (state.finished) stringResource(R.string.mapdl_ready_body) else
+                stringResource(
+                    when (state.stage) {
+                        null -> R.string.mapdl_stage_base
+                        MapExtractor.Stage.FINDING_TILES -> R.string.mapdl_stage_find
+                        else -> R.string.mapdl_stage_download
+                    },
+                ) + (state.fraction?.let { " · ${(it * 100).roundToInt()} %" } ?: ""),
             color = if (state.error != null) Danger else Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp),
         )
         if (state.error == null && !state.finished) {
@@ -583,11 +597,11 @@ private fun MapDownloadBanner(state: MapDownload, onCancel: () -> Unit, onDismis
             Spacer(Modifier.weight(1f))
             if (state.error != null || state.finished) {
                 OutlinedButton(onClick = onDismiss, border = BorderStroke(1.dp, Line), modifier = Modifier.height(36.dp)) {
-                    Text("Cerrar", color = Muted, fontSize = 12.sp)
+                    Text(stringResource(R.string.close), color = Muted, fontSize = 12.sp)
                 }
             } else {
                 OutlinedButton(onClick = onCancel, border = BorderStroke(1.dp, Line), modifier = Modifier.height(36.dp)) {
-                    Text("Cancelar", color = Muted, fontSize = 12.sp)
+                    Text(stringResource(R.string.cancel), color = Muted, fontSize = 12.sp)
                 }
             }
         }
@@ -600,7 +614,7 @@ private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
     Row(
         Modifier.clip(RoundedCornerShape(10.dp)).background(Bg).border(1.dp, Line, RoundedCornerShape(10.dp)).padding(3.dp),
     ) {
-        listOf(false to "Operación", true to "Panel").forEach { (panel, label) ->
+        listOf(false to stringResource(R.string.tab_operation), true to stringResource(R.string.tab_panel)).forEach { (panel, label) ->
             val active = showPanel == panel
             Text(
                 label,
@@ -619,10 +633,10 @@ private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
 @Composable
 private fun SourceChip(link: LinkState, onClick: () -> Unit) {
     val (color, text) = when (link.status) {
-        LinkStatus.IDLE -> Faint to "Elegir fuente"
-        LinkStatus.CONNECTING -> Warn to "Conectando…"
-        LinkStatus.CONNECTED -> Ok to (link.label ?: "Conectado")
-        LinkStatus.RETRYING -> Danger to "Reintentando"
+        LinkStatus.IDLE -> Faint to stringResource(R.string.source_choose)
+        LinkStatus.CONNECTING -> Warn to stringResource(R.string.source_connecting)
+        LinkStatus.CONNECTED -> Ok to (if (link.demo) stringResource(R.string.source_demo) else link.label ?: stringResource(R.string.source_connected))
+        LinkStatus.RETRYING -> Danger to stringResource(R.string.source_retrying)
     }
     Surface(
         shape = RoundedCornerShape(50),
@@ -678,11 +692,11 @@ private fun Legend(showOperator: Boolean, modifier: Modifier = Modifier) {
             .padding(horizontal = 9.dp, vertical = 7.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        LegendRow(Pending, "Pendiente")
-        LegendRow(Confirmed, "Confirmada")
-        LegendRow(Dismissed, "Descartada")
-        LegendRow(Primary, "Dron")
-        if (showOperator) LegendRow(Operator, "Operador")
+        LegendRow(Pending, stringResource(R.string.legend_pending))
+        LegendRow(Confirmed, stringResource(R.string.legend_confirmed))
+        LegendRow(Dismissed, stringResource(R.string.legend_dismissed))
+        LegendRow(Primary, stringResource(R.string.legend_drone))
+        if (showOperator) LegendRow(Operator, stringResource(R.string.legend_operator))
     }
 }
 
@@ -718,8 +732,8 @@ private fun NavigationBanner(
     ) {
         if (operator == null || target == null) {
             Text(
-                if (target == null) "La detección #${alert.id} no tiene posición GPS."
-                else "Esperando la posición de tu teléfono…",
+                if (target == null) stringResource(R.string.nav_no_gps, alert.id.toInt())
+                else stringResource(R.string.nav_wait_phone),
                 color = Color.White, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f),
             )
         } else {
@@ -734,18 +748,18 @@ private fun NavigationBanner(
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("NAVEGANDO A #${alert.id}", color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.nav_to, alert.id.toInt()), color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(formatDistance(distance), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "${Geo.compassPoint(bearing)} · ${bearing.roundToInt()}°",
+                        "${Geo.compassPoint(bearing, isEnglish())} · ${bearing.roundToInt()}°",
                         color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(bottom = 2.dp),
                     )
                 }
                 Text(
-                    if (heading != null) "La flecha apunta según tu teléfono" else "Rumbo respecto al norte (sin brújula)",
+                    stringResource(if (heading != null) R.string.nav_compass else R.string.nav_north),
                     color = Color.White.copy(alpha = 0.8f), fontSize = 10.5.sp,
                 )
             }
@@ -806,12 +820,12 @@ private fun AlertPanel(
                 Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(horizontal = 4.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Detecciones", color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(stringResource(R.string.detections), color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(Modifier.width(8.dp))
                 val pending = mission.pendingCount
                 Surface(shape = RoundedCornerShape(50), color = if (pending > 0) Pending else Line) {
                     Text(
-                        "$pending por revisar",
+                        stringResource(R.string.to_review, pending),
                         color = if (pending > 0) Color(0xFF2A1C00) else Muted,
                         fontSize = 11.sp, fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
@@ -820,7 +834,7 @@ private fun AlertPanel(
                 Spacer(Modifier.weight(1f))
                 if (expanded && listState.canScrollBackward) {
                     Text(
-                        "↑ Ver más",
+                        stringResource(R.string.see_more),
                         color = Primary, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
@@ -829,14 +843,14 @@ private fun AlertPanel(
                     )
                     Spacer(Modifier.width(8.dp))
                 }
-                Text("${mission.alerts.size} en total", color = Muted, fontSize = 11.sp)
+                Text(stringResource(R.string.in_total, mission.alerts.size), color = Muted, fontSize = 11.sp)
                 Spacer(Modifier.width(8.dp))
                 Text(if (expanded) "▾" else "▴", color = Muted)
             }
             if (expanded) {
                 if (mission.alerts.isEmpty()) {
                     Text(
-                        "Sin detecciones todavía.",
+                        stringResource(R.string.no_detections),
                         color = Faint, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                     )
@@ -900,7 +914,7 @@ private fun AlertCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(13.dp).clip(CircleShape).background(statusColor).border(2.dp, Surface1, CircleShape))
             Spacer(Modifier.width(8.dp))
-            Text("Detección #${alert.id}", color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.detection_n, alert.id.toInt()), color = Ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(Modifier.width(8.dp))
             Text(
                 "${(p.confidence * 100).roundToInt()}%",
@@ -908,7 +922,7 @@ private fun AlertCard(
             )
             Spacer(Modifier.weight(1f))
             if (outsideArea) {
-                Text("FUERA DEL ÁREA", color = Warn, fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold)
+                Text(stringResource(R.string.outside_area), color = Warn, fontSize = 9.5.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.width(6.dp))
             }
             StatusTag(alert.status)
@@ -920,14 +934,14 @@ private fun AlertCard(
                 DirectionArrow(bearing.toFloat(), Primary, Modifier.size(13.dp))
                 Spacer(Modifier.width(5.dp))
                 Text(
-                    "${formatDistance(Geo.distanceMeters(operator, pos))} · ${Geo.compassPoint(bearing)} ${bearing.roundToInt()}°",
+                    "${formatDistance(Geo.distanceMeters(operator, pos))} · ${Geo.compassPoint(bearing, isEnglish())} ${bearing.roundToInt()}°",
                     color = Ink, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.width(10.dp))
             }
             Text(
                 "${formatUtc(p.utc)} UTC · " +
-                    (pos?.let { String.format(Locale.ROOT, "%.6f, %.6f", it.lat, it.lon) } ?: "sin posición GPS"),
+                    (pos?.let { String.format(Locale.ROOT, "%.6f, %.6f", it.lat, it.lon) } ?: stringResource(R.string.no_gps_position)),
                 color = Muted, fontSize = 11.sp, maxLines = 1,
             )
         }
@@ -939,13 +953,13 @@ private fun AlertCard(
                     colors = ButtonDefaults.buttonColors(containerColor = Confirmed, contentColor = Color.White),
                     contentPadding = PaddingValues(horizontal = 8.dp),
                     modifier = Modifier.weight(1f).height(38.dp),
-                ) { Text("✓ Confirmar", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.confirm), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 OutlinedButton(
                     onClick = { onDecide(alert.id, AlertStatus.DISMISSED) },
                     border = BorderStroke(1.dp, Line),
                     contentPadding = PaddingValues(horizontal = 8.dp),
                     modifier = Modifier.weight(1f).height(38.dp),
-                ) { Text("✕ Descartar", color = Muted, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                ) { Text(stringResource(R.string.dismiss), color = Muted, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 if (canNavigate) NavButton { onNavigate(alert.id) }
             }
             AlertStatus.CONFIRMED -> Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -955,14 +969,14 @@ private fun AlertCard(
                         colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = Color(0xFF001227)),
                         contentPadding = PaddingValues(horizontal = 8.dp),
                         modifier = Modifier.weight(1f).height(38.dp),
-                    ) { Text("➤ Navegar a", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    ) { Text(stringResource(R.string.navigate), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                 }
                 OutlinedButton(
                     onClick = { onShare(alert) },
                     border = BorderStroke(1.dp, Operator.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(horizontal = 8.dp),
                     modifier = Modifier.weight(1f).height(38.dp),
-                ) { Text("Compartir coordenadas", color = Operator, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                ) { Text(stringResource(R.string.share_coords), color = Operator, fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             }
             AlertStatus.DISMISSED -> Unit
         }
@@ -984,9 +998,9 @@ private fun NavButton(onClick: () -> Unit) {
 @Composable
 private fun StatusTag(status: AlertStatus) {
     val (bg, fg, text) = when (status) {
-        AlertStatus.PENDING -> Triple(Pending, Color(0xFF2A1C00), "PENDIENTE")
-        AlertStatus.CONFIRMED -> Triple(Confirmed, Color.White, "CONFIRMADA")
-        AlertStatus.DISMISSED -> Triple(Line, Muted, "DESCARTADA")
+        AlertStatus.PENDING -> Triple(Pending, Color(0xFF2A1C00), stringResource(R.string.status_pending))
+        AlertStatus.CONFIRMED -> Triple(Confirmed, Color.White, stringResource(R.string.status_confirmed))
+        AlertStatus.DISMISSED -> Triple(Line, Muted, stringResource(R.string.status_dismissed))
     }
     Surface(shape = RoundedCornerShape(50), color = bg) {
         Text(

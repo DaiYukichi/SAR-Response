@@ -97,7 +97,9 @@ class MapExtractor(
     private val onProgress: (Progress) -> Unit = {},
     private val isCancelled: () -> Boolean = { false },
 ) {
-    data class Progress(val stage: String, val done: Long, val total: Long)
+    enum class Stage { FINDING_TILES, DOWNLOADING, DONE }
+
+    data class Progress(val stage: Stage, val done: Long, val total: Long)
 
     data class Result(val tiles: Int, val bytes: Long)
 
@@ -118,7 +120,7 @@ class MapExtractor(
         wanted.forEachIndexed { i, id ->
             checkCancelled()
             locate(id)?.let { (off, len) -> found += Found(id, off, len) }
-            if (i % 500 == 0) onProgress(Progress("Buscando teselas", i.toLong(), wanted.size.toLong()))
+            if (i % 500 == 0) onProgress(Progress(Stage.FINDING_TILES, i.toLong(), wanted.size.toLong()))
         }
         require(found.isNotEmpty()) { "La zona elegida no tiene datos de mapa" }
 
@@ -145,7 +147,7 @@ class MapExtractor(
                 data[off] = chunk.copyOfRange((off - start).toInt(), (off - start).toInt() + len)
                 done += len
             }
-            onProgress(Progress("Descargando", done, total))
+            onProgress(Progress(Stage.DOWNLOADING, done, total))
             i = j + 1
         }
 
@@ -207,7 +209,7 @@ class MapExtractor(
         }
         if (output.exists()) output.delete()
         check(tmp.renameTo(output)) { "No se pudo guardar el mapa" }
-        onProgress(Progress("Listo", total, total))
+        onProgress(Progress(Stage.DONE, total, total))
         return Result(found.size, output.length())
     }
 

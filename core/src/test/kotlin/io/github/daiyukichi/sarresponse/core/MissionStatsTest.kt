@@ -37,10 +37,14 @@ class MissionStatsTest {
 
         val log = MissionLog.events(tracker.state.value)
         assertTrue(log.any { it.kind == LogEvent.Kind.SILENCE })
-        assertTrue(log.any { it.kind == LogEvent.Kind.CONFIRMED && "15 s" in it.text })
+        assertTrue(log.any { it.kind == LogEvent.Kind.CONFIRMED && it.value == 15.0 })
 
         val csv = CsvExporter.detections(tracker.state.value, base).lines()
-        assertTrue(csv[1].startsWith("1,A1,120200,0.90,confirmed,"))
+        assertTrue(csv[0].startsWith("id,unidad,"))
+        assertTrue(csv[1].startsWith("1,A1,120200,0.90,confirmada,"))
+        val csvEn = CsvExporter.detections(tracker.state.value, base, english = true).lines()
+        assertTrue(csvEn[0].startsWith("id,unit,"))
+        assertTrue(csvEn[1].startsWith("1,A1,120200,0.90,confirmed,"))
     }
 
     @Test

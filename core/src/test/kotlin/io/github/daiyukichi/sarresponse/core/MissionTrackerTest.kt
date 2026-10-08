@@ -40,6 +40,8 @@ class MissionTrackerTest {
         assertEquals(6.65, s.batteryVolts)
         assertEquals(true, s.lowBatteryActive)
         assertEquals(listOf(BatteryEvent(2_000L, 6.65)), s.lowBatteryEvents)
+        // Un aviso = una línea en el registro de misión.
+        assertEquals(1, MissionLog.events(s).count { it.kind == LogEvent.Kind.LOW_BATTERY })
         assertEquals(2, s.received)                 // el $SAB cuenta como paquete y para el seq
         assertEquals(0, s.lost)
 

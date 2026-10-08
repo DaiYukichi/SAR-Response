@@ -31,9 +31,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.daiyukichi.sarresponse.R
 import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.CameraGeometry
 import io.github.daiyukichi.sarresponse.core.Geo
@@ -82,24 +84,24 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Kpi(
-                    "Tiempo de misión",
+                    stringResource(R.string.p_mission_time),
                     st.elapsedMillis?.let { formatDuration(it) } ?: "—",
                     when {
-                        search == null -> "crea una búsqueda para empezar"
-                        search.finishedAtMillis != null -> "búsqueda terminada"
-                        else -> "desde que se creó la búsqueda"
+                        search == null -> stringResource(R.string.p_create_to_start)
+                        search.finishedAtMillis != null -> stringResource(R.string.p_search_finished)
+                        else -> stringResource(R.string.p_since_created)
                     },
                     Modifier.weight(1f),
                 )
-                Kpi("Distancia volada", String.format(Locale.ROOT, "%.2f km", st.distanceFlownMeters / 1000), "según el GPS del payload", Modifier.weight(1f))
+                Kpi(stringResource(R.string.p_distance), String.format(Locale.ROOT, "%.2f km", st.distanceFlownMeters / 1000), stringResource(R.string.p_by_gps), Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Kpi("Confirmadas", "${st.confirmed} / ${st.total}", "de las detecciones recibidas", Modifier.weight(1f), valueColor = PConfirmed)
+                Kpi(stringResource(R.string.p_confirmed), "${st.confirmed} / ${st.total}", stringResource(R.string.p_of_received), Modifier.weight(1f), valueColor = PConfirmed)
                 Kpi(
-                    "Paquetes perdidos", String.format(Locale.ROOT, "%.1f %%", st.lossPercent),
-                    if (st.lossPercent < 5) "enlace estable" else if (st.lossPercent < 15) "enlace irregular" else "enlace degradado",
+                    stringResource(R.string.p_lost), String.format(Locale.ROOT, "%.1f %%", st.lossPercent),
+                    stringResource(if (st.lossPercent < 5) R.string.p_link_stable else if (st.lossPercent < 15) R.string.p_link_irregular else R.string.p_link_degraded),
                     Modifier.weight(1f),
                     valueColor = if (st.lossPercent < 5) POk else if (st.lossPercent < 15) PWarn else PDanger,
                 )
@@ -110,9 +112,9 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
             val low = mission.lowBatteryActive || (v != null && v < PacketCodec.LOW_BATTERY_VOLTS)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Kpi(
-                    "Batería del payload",
+                    stringResource(R.string.p_battery),
                     v?.let { String.format(Locale.ROOT, "%.2f V", it) } ?: "—",
-                    mission.batteryAtMillis?.let { "medida hace ${formatSeconds(now - it)}" } ?: "el payload aún no la envió",
+                    mission.batteryAtMillis?.let { stringResource(R.string.p_measured_ago, formatSeconds(now - it)) } ?: stringResource(R.string.p_not_sent),
                     Modifier.weight(1f),
                     valueColor = when {
                         v == null -> PMuted
@@ -122,9 +124,9 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
                     },
                 )
                 Kpi(
-                    "Avisos batería baja",
+                    stringResource(R.string.p_lowbat_alerts),
                     "${mission.lowBatteryEvents.size}",
-                    if (mission.lowBatteryActive) "¡aviso vigente!" else "umbral ${PacketCodec.LOW_BATTERY_VOLTS} V",
+                    if (mission.lowBatteryActive) stringResource(R.string.p_alert_active) else stringResource(R.string.p_threshold, PacketCodec.LOW_BATTERY_VOLTS.toString()),
                     Modifier.weight(1f),
                     valueColor = if (mission.lowBatteryEvents.isEmpty()) PInk else PDanger,
                 )
@@ -137,8 +139,7 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
         item { LogCard(log) }
         item {
             Text(
-                "La cobertura es una estimación con la altura planificada y el FOV de la cámara " +
-                    "(41° por defecto: cámara Pi v1.3 en 1080p; confirmar midiendo).",
+                stringResource(R.string.p_coverage_note),
                 color = PFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
             )
         }
@@ -148,12 +149,11 @@ fun PanelScreen(mission: MissionState, operator: GeoPoint?, now: Long, search: S
 /** Área de la búsqueda y cuánto se ha cubierto (estimado con el recorrido y el ancho de barrido). */
 @Composable
 private fun SearchCard(search: Search?, mission: MissionState) {
-    Card(search?.name ?: "Sin búsqueda activa") {
+    Card(search?.name ?: stringResource(R.string.p_no_active_search)) {
         val area = search?.area
         if (search == null || area == null) {
             Text(
-                if (search == null) "Crea una búsqueda desde la barra de arriba para registrar la misión."
-                else "Esta búsqueda no tiene área. Crea una con área para ver la cobertura.",
+                stringResource(if (search == null) R.string.p_create_from_bar else R.string.p_no_area),
                 color = PFaint, fontSize = 12.sp,
             )
             return@Card
@@ -161,8 +161,8 @@ private fun SearchCard(search: Search?, mission: MissionState) {
         search.altitudeMeters?.let { h ->
             val px = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_LYING_M, h, search.hfovDegrees)
             Text(
-                "A ${h.roundToInt()} m una persona acostada ocupa ≈ ${px.roundToInt()} px en la imagen del modelo" +
-                    if (px < CameraGeometry.MIN_PERSON_PX) " (pocos: la detección puede fallar)" else "",
+                stringResource(R.string.p_px_at, h.roundToInt(), px.roundToInt()) +
+                    if (px < CameraGeometry.MIN_PERSON_PX) stringResource(R.string.p_px_few) else "",
                 color = if (px < CameraGeometry.MIN_PERSON_PX) PWarn else PMuted, fontSize = 11.sp,
                 modifier = Modifier.padding(bottom = 6.dp),
             )
@@ -174,7 +174,7 @@ private fun SearchCard(search: Search?, mission: MissionState) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text("${(coverage * 100).roundToInt()} %", color = PTeal, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.width(8.dp))
-            Text("del área cubierta (estimado)", color = PMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+            Text(stringResource(R.string.p_area_covered), color = PMuted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
         }
         Box(
             Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(6.dp)).background(PSurface2)
@@ -184,14 +184,14 @@ private fun SearchCard(search: Search?, mission: MissionState) {
         }
         Spacer(Modifier.height(10.dp))
         Row {
-            SubKpi("Área", formatArea(area.areaSquareMeters), Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_area), formatArea(area.areaSquareMeters), Modifier.weight(1f))
             SubKpi(
-                "Barrido",
-                "${search.swathMeters.roundToInt()} m" + (search.altitudeMeters?.let { " · ${it.roundToInt()} m alt." } ?: ""),
+                stringResource(R.string.p_swath),
+                "${search.swathMeters.roundToInt()} m" + (search.altitudeMeters?.let { stringResource(R.string.p_alt_suffix, it.roundToInt()) } ?: ""),
                 Modifier.weight(1.4f),
             )
             val outside = mission.alerts.count { a -> a.packet.position?.let { !area.contains(it) } == true }
-            SubKpi("Fuera del área", "$outside", Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_outside), "$outside", Modifier.weight(1f))
         }
     }
 }
@@ -229,15 +229,15 @@ private fun Card(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun DetectionsCard(st: MissionStats) {
-    Card("Detecciones") {
+    Card(stringResource(R.string.detections)) {
         val max = maxOf(1, st.total)
-        Bar("Pendientes", st.pending, max, PPending)
-        Bar("Confirmadas", st.confirmed, max, PConfirmed)
-        Bar("Descartadas", st.dismissed, max, PDismissed)
+        Bar(stringResource(R.string.p_pending), st.pending, max, PPending)
+        Bar(stringResource(R.string.p_confirmed), st.confirmed, max, PConfirmed)
+        Bar(stringResource(R.string.p_dismissed), st.dismissed, max, PDismissed)
         Spacer(Modifier.height(10.dp))
         Row {
-            SubKpi("Decisión promedio", st.avgDecisionMillis?.let { formatSeconds(it) } ?: "—", Modifier.weight(1f))
-            SubKpi("Total recibidas", st.total.toString(), Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_avg_decision), st.avgDecisionMillis?.let { formatSeconds(it) } ?: "—", Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_total_received), st.total.toString(), Modifier.weight(1f))
         }
     }
 }
@@ -269,11 +269,11 @@ private fun SubKpi(label: String, value: String, modifier: Modifier = Modifier) 
 /** Confianza de cada detección (eje Y, 50–100 %) según el momento de la misión en que llegó (eje X). */
 @Composable
 private fun TimelineCard(mission: MissionState) {
-    Card("Línea de tiempo de detecciones") {
+    Card(stringResource(R.string.p_timeline)) {
         val start = mission.startedAtMillis
         val end = maxOf(mission.lastPacketAtMillis ?: 0L, (start ?: 0L) + 1)
         if (start == null || mission.alerts.isEmpty()) {
-            Text("Sin detecciones todavía.", color = PFaint, fontSize = 12.sp)
+            Text(stringResource(R.string.no_detections), color = PFaint, fontSize = 12.sp)
             return@Card
         }
         Canvas(Modifier.fillMaxWidth().height(140.dp)) {
@@ -298,7 +298,7 @@ private fun TimelineCard(mission: MissionState) {
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-            Text("eje: confianza 50–100 %", color = PFaint, fontSize = 10.sp, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.p_axis), color = PFaint, fontSize = 10.sp, modifier = Modifier.weight(1f))
             Text("00:00 → ${formatDuration(end - start)}", color = PFaint, fontSize = 10.sp)
         }
     }
@@ -307,15 +307,15 @@ private fun TimelineCard(mission: MissionState) {
 /** Pérdida por tramo de tiempo; una barra punteada gris = tramo sin ningún paquete (silencio). */
 @Composable
 private fun LinkCard(mission: MissionState, st: MissionStats, now: Long) {
-    Card("Calidad del enlace LoRa") {
+    Card(stringResource(R.string.p_link_quality)) {
         Row {
-            SubKpi("Último paquete", mission.lastPacketAtMillis?.let { "hace ${formatSeconds(now - it)}" } ?: "—", Modifier.weight(1f))
-            SubKpi("Máx. sin señal", formatSeconds(st.maxSilenceMillis), Modifier.weight(1f))
-            SubKpi("Recibidos", "${mission.received}", Modifier.weight(0.8f))
+            SubKpi(stringResource(R.string.p_last_packet), mission.lastPacketAtMillis?.let { stringResource(R.string.ago, formatSeconds(now - it)) } ?: "—", Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_max_silence), formatSeconds(st.maxSilenceMillis), Modifier.weight(1f))
+            SubKpi(stringResource(R.string.p_received), "${mission.received}", Modifier.weight(0.8f))
         }
         Spacer(Modifier.height(12.dp))
         if (st.lossTimeline.isEmpty()) {
-            Text("Sin paquetes todavía.", color = PFaint, fontSize = 12.sp)
+            Text(stringResource(R.string.p_no_packets), color = PFaint, fontSize = 12.sp)
             return@Card
         }
         Canvas(Modifier.fillMaxWidth().height(90.dp)) {
@@ -339,7 +339,7 @@ private fun LinkCard(mission: MissionState, st: MissionStats, now: Long) {
             }
         }
         Text(
-            "Pérdida de paquetes por tramo de la misión · gris punteado = sin señal",
+            stringResource(R.string.p_loss_caption),
             color = PFaint, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp),
         )
     }
@@ -347,20 +347,20 @@ private fun LinkCard(mission: MissionState, st: MissionStats, now: Long) {
 
 @Composable
 private fun TeamCard(mission: MissionState, operator: GeoPoint?) {
-    Card("Equipo") {
+    Card(stringResource(R.string.p_team)) {
         val drone = mission.dronePosition
         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 if (operator != null && drone != null) formatDistance(Geo.distanceMeters(operator, drone)) else "—",
                 color = PInk, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold,
             )
-            Text("operador → dron", color = PMuted, fontSize = 11.sp)
+            Text(stringResource(R.string.p_operator_drone), color = PMuted, fontSize = 11.sp)
         }
         Spacer(Modifier.height(10.dp))
         val rows = mission.alerts.filter { it.status != AlertStatus.DISMISSED && it.packet.position != null }
         if (operator == null || rows.isEmpty()) {
             Text(
-                if (operator == null) "Esperando la posición del teléfono…" else "Sin detecciones activas.",
+                stringResource(if (operator == null) R.string.p_waiting_phone else R.string.p_no_active_detections),
                 color = PFaint, fontSize = 12.sp,
             )
             return@Card
@@ -377,7 +377,7 @@ private fun TeamCard(mission: MissionState, operator: GeoPoint?) {
                     Box(Modifier.fillMaxHeight().fillMaxWidth((d / max).toFloat()).clip(RoundedCornerShape(5.dp)).background(PTeal))
                 }
                 Text(
-                    "${formatDistance(d)} ${Geo.compassPoint(Geo.bearingDegrees(operator, a.packet.position!!))}",
+                    "${formatDistance(d)} ${Geo.compassPoint(Geo.bearingDegrees(operator, a.packet.position!!), isEnglish())}",
                     color = PInk, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.width(92.dp).padding(start = 8.dp),
                 )
@@ -388,9 +388,9 @@ private fun TeamCard(mission: MissionState, operator: GeoPoint?) {
 
 @Composable
 private fun LogCard(log: List<LogEvent>) {
-    Card("Registro de misión") {
+    Card(stringResource(R.string.p_log)) {
         if (log.isEmpty()) {
-            Text("Todavía no hay eventos.", color = PFaint, fontSize = 12.sp)
+            Text(stringResource(R.string.p_no_events), color = PFaint, fontSize = 12.sp)
             return@Card
         }
         val fmt = SimpleDateFormat("HH:mm:ss", Locale.ROOT)
@@ -407,10 +407,24 @@ private fun LogCard(log: List<LogEvent>) {
                 Text(fmt.format(Date(e.atMillis)), color = PFaint, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(62.dp))
                 Box(Modifier.padding(top = 4.dp).size(8.dp).clip(CircleShape).background(color))
                 Spacer(Modifier.width(8.dp))
-                Text(e.text, color = PInk, fontSize = 12.sp)
+                Text(logText(e), color = PInk, fontSize = 12.sp)
             }
         }
-        if (log.size > 40) Text("… y ${log.size - 40} eventos más (exporta el CSV)", color = PFaint, fontSize = 11.sp)
+        if (log.size > 40) Text(stringResource(R.string.p_more_events, log.size - 40), color = PFaint, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun logText(e: LogEvent): String {
+    val id = (e.alertId ?: 0L).toInt()
+    val v = e.value ?: 0.0
+    return when (e.kind) {
+        LogEvent.Kind.START -> stringResource(R.string.log_start)
+        LogEvent.Kind.DETECTION -> stringResource(R.string.log_detection, id, (v * 100).toInt())
+        LogEvent.Kind.CONFIRMED -> stringResource(R.string.log_confirmed, id, v.toInt())
+        LogEvent.Kind.DISMISSED -> stringResource(R.string.log_dismissed, id, v.toInt())
+        LogEvent.Kind.SILENCE -> stringResource(R.string.log_silence, v.toInt())
+        LogEvent.Kind.LOW_BATTERY -> stringResource(R.string.log_lowbat, String.format(Locale.ROOT, "%.2f", v))
     }
 }
 

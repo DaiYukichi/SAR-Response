@@ -87,6 +87,7 @@ pensada para ese punto medio:
 | **Mapa offline** | Mapa vectorial de OpenStreetMap con calles, lugares y nombres en español. Incluido: **mundo con poco detalle + Chiriquí con detalle de calle** (~34 MB). **Descargar mapa de una zona** desde la app (encuadras la zona y listo) o importar un `.pmtiles`. En campo no se descarga nada. |
 | **Arranque listo** | Al abrir por primera vez, pide los permisos de ubicación y Bluetooth en una pantalla de bienvenida; luego el mapa arranca centrado en la posición del operador. |
 | **Modo demo** | Misión simulada para probar y presentar la app sin dron ni radio. |
+| **Español e inglés** | Toda la interfaz, los nombres del mapa, el texto para compartir, el CSV y el GPX en español o inglés. Se elige en **Elegir fuente → Idioma · Language** (Sistema / Español / English) o, en Android 13+, también en *Ajustes → Apps → SAR → Idioma*. |
 | **Pantalla siempre encendida** | Mientras la app está abierta, el teléfono no se bloquea. |
 
 ## Cómo se usa en campo
@@ -307,12 +308,14 @@ SAR-Response/
 │           ├── MapPane.kt     Mapa MapLibre: capas de recorrido, pines, operador y navegación
 │           ├── OfflineMap.kt  Archivo .pmtiles local, importación/descarga y estilo
 │           ├── OnlineMap.kt   Mapa en línea y detección de conexión (cambio automático)
+│           ├── AppLanguage.kt Idioma de la app (Sistema / Español / English)
 │           ├── Panel.kt       Pestaña Panel: indicadores, gráficos y registro
 │           ├── SearchDialogs.kt Lista de búsquedas y "Nueva búsqueda"
 │           ├── Sensors.kt     Ubicación del operador y brújula del teléfono
 │           └── VideoPane.kt   Vista del video del receptor
 │       └── video/UsbVideo.kt  Receptor FPV UVC por USB: permiso, apertura, 720p
-├── app/src/main/assets/mapa/  Estilo, letras e íconos del mapa (y region.pmtiles, generado)
+├── app/src/main/res/values*/  Textos: español (values) e inglés (values-en)
+├── app/src/main/assets/mapa/  Estilos del mapa (es/en), letras e íconos (y region.pmtiles, generado)
 ├── tools/mapa/                Scripts para generar el mapa offline y su estilo
 ├── firmware/esp32-bt-bridge/  Sketch Arduino del puente LoRa → Bluetooth
 └── docs/img/                  Capturas para este README
@@ -498,7 +501,6 @@ cambiar en `ReplaySource.kt`.
   tipos de procesador; una versión de publicación por procesador pesa bastante menos.
 - La distancia y el rumbo son en línea recta; no consideran el terreno ni los caminos.
 - La app asume una sola estación tierra a la vez.
-- Interfaz solo en español por ahora.
 
 ## Trabajo futuro
 
@@ -525,7 +527,7 @@ dirección del proyecto.
 - [ ] **Notas por detección** (p. ej. "persona herida", "requiere camilla").
 - [ ] **Tema claro** como alternativa al oscuro.
 - [ ] Varios drones a la vez (campo `unidad`) con colores distintos.
-- [ ] Traducción al inglés.
+- [x] ~~Traducción al inglés~~ (hecho: interfaz, mapa, compartir, CSV y GPX).
 - [ ] **App de escritorio** con Kotlin Multiplatform reutilizando `core/` y la estación tierra por USB.
 
 ### Red de rescate en campo (requiere nuevo hardware)

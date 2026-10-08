@@ -32,8 +32,13 @@ object Geo {
     )
 
     /** Punto cardinal (16 rumbos, en español: O = oeste) para un rumbo en grados. */
-    fun compassPoint(degrees: Double): String =
-        COMPASS[(Math.floorMod(Math.round(degrees / 22.5).toInt(), 16))]
+    private val COMPASS_EN = listOf(
+        "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+        "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    )
+
+    fun compassPoint(degrees: Double, english: Boolean = false): String =
+        (if (english) COMPASS_EN else COMPASS)[(Math.floorMod(Math.round(degrees / 22.5).toInt(), 16))]
 
     /** Desplaza un punto [north] y [east] metros (aproximación plana, válida a escala de búsqueda). */
     fun offset(p: GeoPoint, north: Double, east: Double): GeoPoint = GeoPoint(

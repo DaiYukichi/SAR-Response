@@ -81,8 +81,15 @@ data class LossBucket(
     val lossPercent: Double?,
 )
 
-/** Evento del registro de misión, derivado del estado (no se guarda aparte). */
-data class LogEvent(val atMillis: Long, val kind: Kind, val text: String) {
+/**
+ * Evento del registro de misión, derivado del estado (no se guarda aparte). Lleva datos, no frases:
+ * la app arma el texto en el idioma elegido.
+ *  - DETECTION: [alertId] y [value] = confianza (0–1)
+ *  - CONFIRMED / DISMISSED: [alertId] y [value] = segundos que tardó la decisión
+ *  - SILENCE: [value] = segundos sin paquetes
+ *  - LOW_BATTERY: [value] = voltios
+ */
+data class LogEvent(val atMillis: Long, val kind: Kind, val alertId: Long? = null, val value: Double? = null) {
     enum class Kind { START, DETECTION, CONFIRMED, DISMISSED, SILENCE, LOW_BATTERY }
 }
 
@@ -92,27 +99,21 @@ object MissionLog {
 
     fun events(s: MissionState): List<LogEvent> {
         val out = mutableListOf<LogEvent>()
-        s.startedAtMillis?.let { out += LogEvent(it, LogEvent.Kind.START, "Primer paquete del payload") }
+        s.startedAtMillis?.let { out += LogEvent(it, LogEvent.Kind.START) }
         for (a in s.alerts) {
-            val conf = (a.packet.confidence * 100).toInt()
-            out += LogEvent(a.receivedAtMillis, LogEvent.Kind.DETECTION, "Detección #${a.id} recibida · $conf%")
+            out += LogEvent(a.receivedAtMillis, LogEvent.Kind.DETECTION, a.id, a.packet.confidence)
             val decided = a.decidedAtMillis ?: continue
-            val secs = (decided - a.receivedAtMillis) / 1000
+            val secs = ((decided - a.receivedAtMillis) / 1000).toDouble()
             when (a.status) {
-                AlertStatus.CONFIRMED -> out += LogEvent(decided, LogEvent.Kind.CONFIRMED, "#${a.id} confirmada por el operador (en $secs s)")
-                AlertStatus.DISMISSED -> out += LogEvent(decided, LogEvent.Kind.DISMISSED, "#${a.id} descartada por el operador (en $secs s)")
+                AlertStatus.CONFIRMED -> out += LogEvent(decided, LogEvent.Kind.CONFIRMED, a.id, secs)
+                AlertStatus.DISMISSED -> out += LogEvent(decided, LogEvent.Kind.DISMISSED, a.id, secs)
                 AlertStatus.PENDING -> Unit
             }
         }
-        for (e in s.lowBatteryEvents) {
-            out += LogEvent(e.atMillis, LogEvent.Kind.LOW_BATTERY, "Batería baja del payload: ${"%.2f".format(Locale.ROOT, e.volts)} V")
-        }
-        for (e in s.lowBatteryEvents) {
-            out += LogEvent(e.atMillis, LogEvent.Kind.LOW_BATTERY, "Batería baja del payload: ${"%.2f".format(Locale.ROOT, e.volts)} V")
-        }
+        for (e in s.lowBatteryEvents) out += LogEvent(e.atMillis, LogEvent.Kind.LOW_BATTERY, value = e.volts)
         s.packets.zipWithNext { a, b ->
             val gap = b.atMillis - a.atMillis
-            if (gap > SILENCE_MS) out += LogEvent(b.atMillis, LogEvent.Kind.SILENCE, "Enlace recuperado tras ${gap / 1000} s sin paquetes")
+            if (gap > SILENCE_MS) out += LogEvent(b.atMillis, LogEvent.Kind.SILENCE, value = (gap / 1000).toDouble())
         }
         return out.sortedByDescending { it.atMillis }
     }
@@ -120,8 +121,11 @@ object MissionLog {
 
 /** CSV de detecciones para el informe posterior (Excel, QGIS, etc.). */
 object CsvExporter {
-    fun detections(s: MissionState, operator: GeoPoint?): String = buildString {
-        append("id,unidad,hora_utc,confianza,estado,lat,lon,recibida_ms,decidida_ms,segundos_decision,dist_operador_m,rumbo_operador\n")
+    private const val HEADER_ES = "id,unidad,hora_utc,confianza,estado,lat,lon,recibida_ms,decidida_ms,segundos_decision,dist_operador_m,rumbo_operador"
+    private const val HEADER_EN = "id,unit,utc_time,confidence,status,lat,lon,received_ms,decided_ms,decision_seconds,operator_dist_m,operator_bearing"
+
+    fun detections(s: MissionState, operator: GeoPoint?, english: Boolean = false): String = buildString {
+        append(if (english) HEADER_EN else HEADER_ES).append('\n')
         for (a in s.alerts) {
             val p = a.packet
             val pos = p.position
@@ -129,11 +133,17 @@ object CsvExporter {
             val brg = if (pos != null && operator != null) "%.0f".format(Locale.ROOT, Geo.bearingDegrees(operator, pos)) else ""
             val decSecs = a.decidedAtMillis?.let { ((it - a.receivedAtMillis) / 1000).toString() } ?: ""
             append(listOf(
-                a.id, p.unit, p.utc, "%.2f".format(Locale.ROOT, p.confidence), a.status.name.lowercase(),
+                a.id, p.unit, p.utc, "%.2f".format(Locale.ROOT, p.confidence), statusWord(a.status, english),
                 pos?.let { "%.6f".format(Locale.ROOT, it.lat) } ?: "", pos?.let { "%.6f".format(Locale.ROOT, it.lon) } ?: "",
                 a.receivedAtMillis, a.decidedAtMillis ?: "", decSecs, dist, brg,
             ).joinToString(","))
             append('\n')
         }
+    }
+
+    private fun statusWord(st: AlertStatus, english: Boolean) = when (st) {
+        AlertStatus.PENDING -> if (english) "pending" else "pendiente"
+        AlertStatus.CONFIRMED -> if (english) "confirmed" else "confirmada"
+        AlertStatus.DISMISSED -> if (english) "dismissed" else "descartada"
     }
 }

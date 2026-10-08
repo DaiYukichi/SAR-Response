@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +29,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import io.github.daiyukichi.sarresponse.R
 import io.github.daiyukichi.sarresponse.core.AlertStatus
 import io.github.daiyukichi.sarresponse.core.GeoPoint
 import io.github.daiyukichi.sarresponse.core.MissionState
@@ -119,7 +121,7 @@ fun MapPane(
     val json = style
     if (json == null) {
         Box(modifier.background(Color(0xFF0B1118)), contentAlignment = Alignment.Center) {
-            Text("Preparando mapa offline…", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+            Text(stringResource(R.string.map_preparing), color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
         }
         return
     }
@@ -159,7 +161,7 @@ fun MapPane(
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { holder.map }, update = { holder.render(state, selectedAlertId, operator, navTargetId, pulse, area, draft) })
         Text(
-            if (usingOnline) "● En línea" else "● Offline",
+            stringResource(if (usingOnline) R.string.map_online else R.string.map_offline),
             color = if (usingOnline) Color(0xFF34D399) else Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -180,7 +182,7 @@ fun MapPane(
         )
         if (!hasBaseMap) {
             Text(
-                "Sin mapa offline: importa un archivo .pmtiles desde \"Elegir fuente\".",
+                stringResource(R.string.map_none),
                 color = Color.White, fontSize = 12.sp,
                 modifier = Modifier
                     .align(Alignment.Center)

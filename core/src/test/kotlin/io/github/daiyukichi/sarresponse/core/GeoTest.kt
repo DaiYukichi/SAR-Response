@@ -24,5 +24,7 @@ class GeoTest {
         assertEquals("S", Geo.compassPoint(180.0))
         assertEquals("O", Geo.compassPoint(270.0))
         assertEquals("NO", Geo.compassPoint(315.0))
+        assertEquals("NW", Geo.compassPoint(315.0, english = true))
+        assertEquals("W", Geo.compassPoint(270.0, english = true))
     }
 }

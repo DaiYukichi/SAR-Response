@@ -22,7 +22,9 @@ sealed interface VideoStatus {
     data object WaitingUsbPermission : VideoStatus
     data object Connecting : VideoStatus
     data class Streaming(val width: Int, val height: Int) : VideoStatus
-    data class Failed(val message: String) : VideoStatus
+    data object UsbDenied : VideoStatus
+    /** [message] = detalle técnico de la librería, si lo hay. */
+    data class Failed(val message: String?) : VideoStatus
 }
 
 /**
@@ -156,13 +158,13 @@ class UsbVideo(private val context: Context) {
         override fun onCancel(device: UsbDevice) {
             main.post {
                 selected = null
-                status = VideoStatus.Failed("Permiso USB denegado. Desconecta y vuelve a conectar el receptor.")
+                status = VideoStatus.UsbDenied
             }
         }
 
         override fun onError(device: UsbDevice?, e: CameraException?) {
             Log.e(TAG, "Error de video", e)
-            main.post { status = VideoStatus.Failed(e?.message ?: "No se pudo abrir el receptor de video") }
+            main.post { status = VideoStatus.Failed(e?.message) }
         }
     }
 

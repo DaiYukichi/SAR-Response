@@ -23,12 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import io.github.daiyukichi.sarresponse.R
 import io.github.daiyukichi.sarresponse.video.UsbVideo
 import io.github.daiyukichi.sarresponse.video.VideoStatus
 
@@ -76,14 +78,16 @@ fun VideoPane(
         )
 
         if (status !is VideoStatus.Streaming) {
-            val canRetry = status is VideoStatus.WaitingUsbPermission || status is VideoStatus.Connecting || status is VideoStatus.Failed
+            val canRetry = status is VideoStatus.WaitingUsbPermission || status is VideoStatus.Connecting ||
+                status is VideoStatus.Failed || status is VideoStatus.UsbDenied
             Text(
-                if (compact) "VIDEO" else when (status) {
-                    VideoStatus.NoDevice -> "Video 5.8 GHz\nConecta el receptor al teléfono por USB (OTG)."
-                    VideoStatus.NeedCameraPermission -> "Video 5.8 GHz\nFalta el permiso de cámara: Android lo exige para leer el receptor USB."
-                    VideoStatus.WaitingUsbPermission -> "Video 5.8 GHz\nAcepta el permiso USB que muestra Android.\n(Toca aquí si no aparece.)"
-                    VideoStatus.Connecting -> "Video 5.8 GHz\nConectando con el receptor…\n(Toca aquí para reintentar.)"
-                    is VideoStatus.Failed -> "Video 5.8 GHz\n${status.message}\n(Toca aquí para reintentar.)"
+                if (compact) stringResource(R.string.video_label) else when (status) {
+                    VideoStatus.NoDevice -> stringResource(R.string.video_no_device)
+                    VideoStatus.NeedCameraPermission -> stringResource(R.string.video_need_camera)
+                    VideoStatus.WaitingUsbPermission -> stringResource(R.string.video_wait_usb)
+                    VideoStatus.Connecting -> stringResource(R.string.video_connecting)
+                    VideoStatus.UsbDenied -> stringResource(R.string.video_failed, stringResource(R.string.video_usb_denied))
+                    is VideoStatus.Failed -> stringResource(R.string.video_failed, status.message ?: stringResource(R.string.video_open_failed))
                     is VideoStatus.Streaming -> ""
                 },
                 color = Color(0xFF8A96A3),
@@ -96,7 +100,7 @@ fun VideoPane(
             )
         } else if (compact) {
             Text(
-                "VIDEO", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
+                stringResource(R.string.video_label), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(5.dp)
@@ -112,7 +116,7 @@ fun VideoPane(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 VideoButton("⟳ ${rotation}°") { rotation = (rotation + 90) % 360 }
-                VideoButton(if (fullscreen) "Salir ⤡" else "⤢ Completa", onToggleFullscreen)
+                VideoButton(stringResource(if (fullscreen) R.string.video_exit else R.string.video_fullscreen), onToggleFullscreen)
             }
         }
     }

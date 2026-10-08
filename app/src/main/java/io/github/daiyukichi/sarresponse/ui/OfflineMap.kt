@@ -20,6 +20,7 @@ import java.io.File
 object OfflineMap {
     private const val BUNDLED_ASSET = "mapa/region.pmtiles"
     private const val STYLE_ASSET = "mapa/estilo-oscuro.json"
+    private const val STYLE_ASSET_EN = "mapa/estilo-oscuro-en.json"
 
     private fun dir(context: Context) = File(context.filesDir, "mapas").apply { mkdirs() }
     private fun importedDir(context: Context) = File(dir(context), "propios").apply { mkdirs() }
@@ -79,7 +80,9 @@ object OfflineMap {
 
     /** Mismo estilo (oscuro, en español) para cualquier origen PMTiles: archivo local o URL en línea. */
     fun styleFor(context: Context, pmtilesUrl: String): String {
-        val template = context.assets.open(STYLE_ASSET).bufferedReader().use { it.readText() }
+        // Nombres de lugares en el idioma de la app.
+        val asset = if (context.isEnglish()) STYLE_ASSET_EN else STYLE_ASSET
+        val template = context.assets.open(asset).bufferedReader().use { it.readText() }
         return template.replace("{{PMTILES_URL}}", pmtilesUrl)
     }
 

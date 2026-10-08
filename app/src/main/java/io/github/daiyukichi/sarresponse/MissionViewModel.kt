@@ -44,7 +44,8 @@ enum class LinkStatus { IDLE, CONNECTING, CONNECTED, RETRYING }
 
 /** Descarga de un mapa offline en curso (o su resultado). */
 data class MapDownload(
-    val stage: String,
+    /** null = buscando el mapa base (antes de empezar a recortar). */
+    val stage: MapExtractor.Stage?,
     val fraction: Float? = null,
     val error: String? = null,
     val finished: Boolean = false,
@@ -54,6 +55,8 @@ data class LinkState(
     val label: String? = null,
     val status: LinkStatus = LinkStatus.IDLE,
     val error: String? = null,
+    /** Fuente = misión simulada (el nombre se muestra traducido). */
+    val demo: Boolean = false,
 )
 
 @OptIn(FlowPreview::class)
@@ -99,7 +102,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         if (mapJob?.isActive == true) return
         val context = getApplication<Application>()
         mapJob = viewModelScope.launch {
-            _mapDownload.value = MapDownload("Buscando el mapa base…")
+            _mapDownload.value = MapDownload(null)
             val target = OfflineMap.newTarget(context)
             try {
                 val job = coroutineContext[Job]
@@ -114,7 +117,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
                     ).extract(listOf(MapRegion.WORLD_OVERVIEW, region), target)
                     OfflineMap.commit(context, target)
                 }
-                _mapDownload.value = MapDownload("Mapa descargado", 1f, finished = true)
+                _mapDownload.value = MapDownload(MapExtractor.Stage.DONE, 1f, finished = true)
                 onReady()
             } catch (e: CancellationException) {
                 target.delete()
@@ -122,7 +125,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 target.delete()
-                _mapDownload.value = MapDownload("Error", error = e.message ?: e.javaClass.simpleName)
+                _mapDownload.value = MapDownload(null, error = e.message ?: e.javaClass.simpleName)
             }
         }
     }
@@ -199,7 +202,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             // La demo crea su propia búsqueda, con un área alrededor del barrido simulado.
             // 36 m de altura con el FOV provisional ≈ 50 m de barrido, igual a la separación de pasadas.
-            activate(newSearch("Demo ${timeLabel()}", SearchArea.rectangle(demo.center, 280.0, 330.0), 36.0, CameraGeometry.DEFAULT_HFOV_DEGREES))
+            activate(newSearch(getApplication<Application>().getString(R.string.source_demo) + " " + timeLabel(), SearchArea.rectangle(demo.center, 280.0, 330.0), 36.0, CameraGeometry.DEFAULT_HFOV_DEGREES))
             connect(demo, reconnect = false)
         }
     }
@@ -210,7 +213,7 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             // Si llegan datos sin una búsqueda abierta, se crea una para no perder nada.
             if (_activeSearch.value == null) {
-                activate(newSearch("Búsqueda ${timeLabel()}", null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES))
+                activate(newSearch(defaultName(), null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES))
             }
             connect(makeSource { _link.update { it.copy(status = LinkStatus.CONNECTED, error = null) } }, reconnect = true)
         }
@@ -218,12 +221,12 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun newSearch(name: String, area: SearchArea?, altitudeMeters: Double, hfovDegrees: Double): Search {
         val now = System.currentTimeMillis()
-        return Search.planned("b$now", name.ifBlank { "Búsqueda ${timeLabel()}" }, now, area, altitudeMeters, hfovDegrees)
+        return Search.planned("b$now", name.ifBlank { defaultName() }, now, area, altitudeMeters, hfovDegrees)
     }
 
     /** Crea una búsqueda con lo ya recibido (sin borrarlo), para que se guarde. */
     private suspend fun adoptCurrentAsSearch() {
-        val search = newSearch("Búsqueda ${timeLabel()}", null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES)
+        val search = newSearch(defaultName(), null, Search.DEFAULT_ALTITUDE_METERS, CameraGeometry.DEFAULT_HFOV_DEGREES)
         _activeSearch.value = search
         withContext(Dispatchers.IO) {
             store.save(search, mission.value)
@@ -253,6 +256,8 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         _searches.value = withContext(Dispatchers.IO) { store.list() }
     }
 
+    private fun defaultName() = getApplication<Application>().getString(R.string.search_default, timeLabel())
+
     private fun timeLabel() = SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(Date())
 
     fun stop() {
@@ -262,14 +267,14 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
 
     fun decide(alertId: Long, status: AlertStatus) = tracker.decide(alertId, status)
 
-    fun exportGpx(): String = GpxExporter.export(mission.value, _activeSearch.value?.name)
+    fun exportGpx(english: Boolean = false): String = GpxExporter.export(mission.value, _activeSearch.value?.name, english)
 
     private fun connect(source: LinkSource, reconnect: Boolean) {
         linkJob?.cancel()
         linkJob = viewModelScope.launch {
             var backoff = 1_000L
             while (isActive) {
-                _link.update { it.copy(label = source.label, status = LinkStatus.CONNECTING) }
+                _link.update { it.copy(label = source.label, status = LinkStatus.CONNECTING, demo = source is ReplaySource) }
                 try {
                     source.lines().collect { line ->
                         if (_link.value.status != LinkStatus.CONNECTED) {

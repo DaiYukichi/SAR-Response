@@ -14,7 +14,7 @@ fun main(args: Array<String>) {
     val src = args.getOrNull(3) ?: MapExtractor.latestProtomapsBuild()
     println("Origen: $src")
     val source = if (src.startsWith("http")) HttpRangeSource(src) else LocalRangeSource(File(src))
-    var lastStage = ""
+    var lastStage: MapExtractor.Stage? = null
     val result = MapExtractor(source, onProgress = { p ->
         if (p.stage != lastStage || p.done == p.total) {
             println("${p.stage}: ${p.done}/${p.total}")
