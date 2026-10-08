@@ -122,7 +122,7 @@ fun SearchesDialog(
 
 /**
  * Datos de una búsqueda nueva antes de (opcionalmente) dibujar su área.
- * Con la altura de vuelo y el FOV de la cámara se calcula el ancho de barrido y cuántos píxeles
+ * Con la altura de vuelo y el FOV fijo de la cámara del payload se calcula el ancho de barrido y cuántos píxeles
  * ocupa una persona en la imagen que ve el modelo, con un aviso si es demasiado poco.
  */
 @Composable
@@ -134,10 +134,10 @@ fun NewSearchDialog(
 ) {
     var name by remember { mutableStateOf(suggestedName) }
     var altitude by remember { mutableStateOf(Search.DEFAULT_ALTITUDE_METERS.toInt().toString()) }
-    var fov by remember { mutableStateOf(CameraGeometry.DEFAULT_HFOV_DEGREES.toInt().toString()) }
     val h = altitude.toDoubleOrNull()?.takeIf { it in 2.0..300.0 }
-    val f = fov.toDoubleOrNull()?.takeIf { it in 10.0..170.0 }
-    val valid = h != null && f != null
+    // FOV fijo: OV5647 en 1280×960 con el sensor completo.
+    val f = CameraGeometry.DEFAULT_HFOV_DEGREES
+    val valid = h != null
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.new_search_title)) },
@@ -145,28 +145,15 @@ fun NewSearchDialog(
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.name)) }, singleLine = true)
                 Spacer(Modifier.padding(4.dp))
-                Row {
-                    OutlinedTextField(
-                        value = altitude,
-                        onValueChange = { altitude = it.filter(Char::isDigit).take(3) },
-                        label = { Text(stringResource(R.string.altitude_m)) },
-                        singleLine = true,
-                        isError = h == null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = fov,
-                        onValueChange = { fov = it.filter(Char::isDigit).take(3) },
-                        label = { Text(stringResource(R.string.fov_deg)) },
-                        singleLine = true,
-                        isError = f == null,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (h != null && f != null) {
+                OutlinedTextField(
+                    value = altitude,
+                    onValueChange = { altitude = it.filter(Char::isDigit).take(3) },
+                    label = { Text(stringResource(R.string.altitude_m)) },
+                    singleLine = true,
+                    isError = h == null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+                if (h != null) {
                     val swath = CameraGeometry.swathMeters(h, f)
                     val lying = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_LYING_M, h, f)
                     val above = CameraGeometry.pixelsOnModel(CameraGeometry.PERSON_FROM_ABOVE_M, h, f)
@@ -193,11 +180,6 @@ fun NewSearchDialog(
                     }
                 }
                 Text(
-                    stringResource(R.string.fov_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                Text(
                     stringResource(R.string.draw_later),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 6.dp),
@@ -205,14 +187,14 @@ fun NewSearchDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onDrawArea(name, h!!, f!!) }) {
+            TextButton(enabled = valid, onClick = { onDrawArea(name, h!!, f) }) {
                 Text(stringResource(R.string.draw_area), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             Row {
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-                TextButton(enabled = valid, onClick = { onCreateWithoutArea(name, h!!, f!!) }) {
+                TextButton(enabled = valid, onClick = { onCreateWithoutArea(name, h!!, f) }) {
                     Text(stringResource(R.string.no_area))
                 }
             }

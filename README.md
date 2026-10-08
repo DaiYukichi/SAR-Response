@@ -80,7 +80,7 @@ pensada para ese punto medio:
 | **Protección contra toques equivocados** | La lista no se desplaza sola, y durante 0,8 s después de que se reordena (llegó una detección o se tomó una decisión) los botones no responden. Así un toque no cae en otra tarjeta. |
 | **Salud del enlace** | Estado del Bluetooth con la estación tierra, tiempo desde el último paquete LoRa, fix y satélites del GPS del payload, y paquetes recibidos / perdidos / corruptos. |
 | **Reconexión automática** | Si se cae el Bluetooth, la app reintenta sola (1 s, 2 s, 4 s… hasta 10 s). |
-| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
+| **Búsquedas** | Cada búsqueda tiene nombre, **área dibujada sobre el mapa offline** (tocando sus esquinas) y **altura de vuelo planificada**: con ella y el FOV de la cámara del payload (fijo, 53,5°) la app calcula el ancho de barrido y **cuántos píxeles ocupa una persona** en la imagen del modelo, y avisa si la altura es demasiado alta para detectar bien. Se ve el borde del área, un aviso si el dron sale de ella y las detecciones fuera del área quedan marcadas. Todo se **guarda en el teléfono**: si Android cierra la app, la búsqueda vuelve tal cual; las anteriores se pueden abrir, exportar o borrar. |
 | **Panel de la misión** | Pestaña **Panel** con indicadores calculados solo con datos reales: tiempo de misión, distancia volada, confirmadas / total, % de paquetes perdidos, **tiempo promedio de decisión del operador**, línea de tiempo de detecciones, pérdida de paquetes por tramo y mayor tiempo sin señal, distancias del equipo y registro de la misión. |
 | **Exportar** | **GPX** con las detecciones confirmadas y pendientes (las descartadas no) y el recorrido del dron, para OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** con cada detección, su estado, cuándo llegó, cuándo se decidió, en cuántos segundos y a qué distancia del operador, para el informe posterior. |
 | **Mapa en línea u offline** | Con internet, el mapa del mundo entero con detalle de calle se carga en línea (indicador **● En línea**). Sin internet, o si se corta, cambia solo al mapa del teléfono (**● Offline**). Se puede apagar el modo en línea en **Elegir fuente**. |
@@ -100,7 +100,7 @@ pensada para ese punto medio:
    - Empareja una sola vez el teléfono con la estación tierra (**SAR-Estacion**) en
      *Ajustes → Bluetooth*.
 2. **Crear la búsqueda**
-   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre, altura de vuelo y FOV de la cámara.
+   - Toca la barra **BÚSQUEDA** → **＋ Nueva búsqueda**: nombre y altura de vuelo.
      La app muestra el barrido y el tamaño de una persona en píxeles (✓ / ⚠).
    - **Dibujar área:** toca las esquinas del área en el mapa (mínimo 3) y **Crear búsqueda**.
      Ves la superficie mientras dibujas. También puedes crearla **sin área**.
@@ -198,10 +198,10 @@ altura constante.
 **Altura, barrido y tamaño de la persona.** Con la cámara hacia abajo, el ancho de terreno visto es
 `2 × altura × tan(FOV/2)`. El modelo recibe la imagen reducida a 640 px de ancho, así que una persona
 de tamaño `s` ocupa `s × 640 / barrido` píxeles. El modelo se entrenó con personas de unos 13×16 px;
-por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV por defecto es 53,5°**: la cámara
+por debajo de ~12 px la detección cae, y la app lo advierte. El **FOV es fijo, 53,5°**: la cámara
 del payload es la Raspberry Pi v1.3 (OV5647, módulo P5V04A) en modo **1280×960**, que usa el sensor
-completo (53,5° × 41,4°). Si se cambia de modo o de lente, se mide: a 2 m de una pared, ancho `W`
-visible y `FOV = 2·atan(W/4)`.
+completo (53,5° × 41,4°). Si se cambia de modo o de lente, se cambia `DEFAULT_HFOV_DEGREES` en
+`CameraGeometry.kt`.
 
 ### Panel de detecciones (abajo)
 
