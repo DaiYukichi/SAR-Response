@@ -462,8 +462,13 @@ private fun SearchChip(search: Search?, onClick: () -> Unit) {
             fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1,
             modifier = Modifier.weight(1f),
         )
-        search?.area?.let {
-            Text(formatArea(it.areaSquareMeters), color = AreaColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        val area = search?.area
+        if (area != null) {
+            Text(formatArea(area.areaSquareMeters), color = AreaColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+        } else if (search != null) {
+            // Búsqueda sin área (p. ej. creada sola al conectar): invitar a dibujarla.
+            Text(stringResource(R.string.add_area_hint), color = Warn, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.width(8.dp))
         }
         Text("▾", color = Muted)

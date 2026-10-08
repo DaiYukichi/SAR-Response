@@ -170,6 +170,16 @@ class MissionViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Pone o cambia el área de la búsqueda en curso (lo recibido hasta ahora se conserva). */
+    fun setActiveArea(area: SearchArea) {
+        viewModelScope.launch {
+            val updated = _activeSearch.value?.copy(area = area) ?: return@launch
+            _activeSearch.value = updated
+            withContext(Dispatchers.IO) { store.save(updated, mission.value) }
+            refreshList()
+        }
+    }
+
     /** Cierra la búsqueda actual: queda guardada en la lista y los paquetes nuevos van a otra. */
     fun finishSearch() {
         viewModelScope.launch {

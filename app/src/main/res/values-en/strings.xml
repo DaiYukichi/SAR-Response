@@ -94,7 +94,7 @@
     <string name="p_coverage_note">Coverage is an estimate from the planned altitude and the camera FOV (53.5° by default: Pi v1.3 camera at 1280×960, full sensor).</string>
     <string name="p_no_active_search">No active search</string>
     <string name="p_create_from_bar">Create a search from the bar above to record the mission.</string>
-    <string name="p_no_area">This search has no area. Create one with an area to see coverage.</string>
+    <string name="p_no_area">This search has no area. Tap the search above → Draw area to see coverage.</string>
     <string name="p_px_at">At %1$d m a person lying down takes ≈ %2$d px in the model\'s image</string>
     <string name="p_px_few"> (few: detection may fail)</string>
     <string name="p_area_covered">of the area covered (estimated)</string>
@@ -201,4 +201,6 @@
     <string name="rec_failed">Could not record video: %1$s</string>
     <string name="link_closed">Link closed</string>
     <string name="settings_title">Settings</string>
+    <string name="edit_area">Redraw area</string>
+    <string name="add_area_hint">＋ area</string>
 </resources>

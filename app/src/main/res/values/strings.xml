@@ -95,7 +95,7 @@
     <string name="p_coverage_note">La cobertura es una estimación con la altura planificada y el FOV de la cámara (53,5° por defecto: cámara Pi v1.3 en 1280×960, sensor completo).</string>
     <string name="p_no_active_search">Sin búsqueda activa</string>
     <string name="p_create_from_bar">Crea una búsqueda desde la barra de arriba para registrar la misión.</string>
-    <string name="p_no_area">Esta búsqueda no tiene área. Crea una con área para ver la cobertura.</string>
+    <string name="p_no_area">Esta búsqueda no tiene área. Toca la búsqueda arriba → Dibujar área para ver la cobertura.</string>
     <string name="p_px_at">A %1$d m una persona acostada ocupa ≈ %2$d px en la imagen del modelo</string>
     <string name="p_px_few"> (pocos: la detección puede fallar)</string>
     <string name="p_area_covered">del área cubierta (estimado)</string>
@@ -202,4 +202,6 @@
     <string name="rec_failed">No se pudo grabar el video: %1$s</string>
     <string name="link_closed">Enlace cerrado</string>
     <string name="settings_title">Ajustes</string>
+    <string name="edit_area">Redibujar área</string>
+    <string name="add_area_hint">＋ área</string>
 </resources>

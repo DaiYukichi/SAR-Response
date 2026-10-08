@@ -53,6 +53,7 @@ fun SearchesDialog(
     onDelete: (String) -> Unit,
     onExportGpx: () -> Unit,
     onExportCsv: () -> Unit,
+    onEditArea: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf<SearchSummary?>(null) }
@@ -70,6 +71,10 @@ fun SearchesDialog(
                                 ?: stringResource(R.string.no_area_suffix)),
                         style = MaterialTheme.typography.bodySmall,
                     )
+                    // Sin área: dibujarla ahora; con área: redibujarla (la anterior se ve de referencia).
+                    TextButton(onClick = onEditArea) {
+                        Text(stringResource(if (active.area == null) R.string.draw_area else R.string.edit_area), fontWeight = FontWeight.Bold)
+                    }
                     Row {
                         TextButton(onClick = onExportGpx) { Text(stringResource(R.string.export_gpx)) }
                         TextButton(onClick = onExportCsv) { Text(stringResource(R.string.export_csv)) }

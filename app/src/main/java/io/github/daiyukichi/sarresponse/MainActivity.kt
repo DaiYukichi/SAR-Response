@@ -124,6 +124,8 @@ class MainActivity : ComponentActivity() {
                 var draftAltitude by remember { mutableStateOf(Search.DEFAULT_ALTITUDE_METERS) }
                 var draftFov by remember { mutableStateOf(CameraGeometry.DEFAULT_HFOV_DEGREES) }
                 var draft by remember { mutableStateOf<List<GeoPoint>?>(null) }
+                // true = el área dibujada es para la búsqueda en curso, no para una nueva.
+                var draftForActive by remember { mutableStateOf(false) }
                 var pickingMapArea by remember { mutableStateOf(false) }
                 val mapDownload by vm.mapDownload.collectAsStateWithLifecycle()
                 var showSources by remember { mutableStateOf(false) }
@@ -259,10 +261,14 @@ class MainActivity : ComponentActivity() {
                         draft = draft,
                         onMapTap = { p -> draft = draft?.plus(p) },
                         onDraftUndo = { draft = draft?.dropLast(1) },
-                        onDraftCancel = { draft = null },
+                        onDraftCancel = { draft = null; draftForActive = false },
                         onDraftConfirm = {
-                            draft?.takeIf { it.size >= 3 }?.let { vm.createSearch(draftName, SearchArea(it), draftAltitude, draftFov) }
+                            draft?.takeIf { it.size >= 3 }?.let {
+                                if (draftForActive) vm.setActiveArea(SearchArea(it))
+                                else vm.createSearch(draftName, SearchArea(it), draftAltitude, draftFov)
+                            }
                             draft = null
+                            draftForActive = false
                         },
                         pickingMapArea = pickingMapArea,
                         mapDownload = mapDownload,
@@ -301,6 +307,11 @@ class MainActivity : ComponentActivity() {
                             showSearches = false
                             exportCsv.launch("${fileStem(activeSearch)}-${getString(R.string.csv_suffix)}.csv")
                         },
+                        onEditArea = {
+                            showSearches = false
+                            draftForActive = true
+                            draft = emptyList()
+                        },
                         onDismiss = { showSearches = false },
                     )
                 }
@@ -311,6 +322,7 @@ class MainActivity : ComponentActivity() {
                             draftName = name
                             draftAltitude = altitude
                             draftFov = fov
+                            draftForActive = false
                             draft = emptyList()
                             showNewSearch = false
                         },
