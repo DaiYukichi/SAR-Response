@@ -200,6 +200,7 @@ fun DashboardScreen(
                         onlineEnabled = onlineMapEnabled,
                         onAlertClick = { selectedAlertId = it },
                         modifier = if (mapIsMain) main else pip,
+                        compact = !mapIsMain,
                         area = area,
                         draft = draft,
                         onMapTap = onMapTap,

@@ -88,6 +88,8 @@ fun MapPane(
     onMapTap: (GeoPoint) -> Unit = {},
     /** Zona visible (oeste, sur, este, norte) cada vez que el mapa se detiene. */
     onVisibleBounds: (DoubleArray) -> Unit = {},
+    /** Mapa en miniatura: sin indicador en línea/offline y con la atribución corta. */
+    compact: Boolean = false,
 ) {
     val context = LocalContext.current
     var hasBaseMap by remember { mutableStateOf(true) }
@@ -160,7 +162,7 @@ fun MapPane(
 
     Box(modifier.clipToBounds()) {
         AndroidView(factory = { holder.map }, update = { holder.render(state, selectedAlertId, operator, navTargetId, pulse, area, draft) })
-        Text(
+        if (!compact) Text(
             stringResource(if (usingOnline) R.string.map_online else R.string.map_offline),
             color = if (usingOnline) Color(0xFF34D399) else Color(0xFFFBBF24), fontSize = 10.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier
@@ -171,8 +173,8 @@ fun MapPane(
                 .padding(horizontal = 6.dp, vertical = 2.dp),
         )
         Text(
-            "© OpenStreetMap · Protomaps",
-            color = Color.White.copy(alpha = 0.75f), fontSize = 9.sp,
+            if (compact) "© OpenStreetMap" else "© OpenStreetMap · Protomaps",
+            color = Color.White.copy(alpha = 0.75f), fontSize = if (compact) 7.sp else 9.sp, maxLines = 1,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(4.dp)

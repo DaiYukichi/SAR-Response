@@ -20,9 +20,9 @@ dron, dónde se detectó a alguien, mirar el video, decidir** si la detección e
 **guiar a quien va a pie** hasta esa persona.
 
 <p align="center">
-  <img src="docs/img/mapa.png" width="300" alt="Mapa con recorrido del dron, detecciones y navegación hacia la detección #3">
+  <img src="docs/img/mapa.png" width="300" alt="Operación: área de búsqueda, recorrido del dron, detecciones pendientes, confirmadas y descartadas">
   &nbsp;&nbsp;
-  <img src="docs/img/video.png" width="300" alt="Vista de video con el mapa en miniatura">
+  <img src="docs/img/panel.png" width="300" alt="Panel: cobertura del área, tiempo de misión, batería del payload y aviso de batería baja">
 </p>
 
 <p align="center"><sub>Capturas con la misión simulada (modo demo). Datos del mapa © colaboradores de OpenStreetMap.</sub></p>
