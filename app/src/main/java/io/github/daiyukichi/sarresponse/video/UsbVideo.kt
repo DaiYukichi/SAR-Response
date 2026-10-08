@@ -248,7 +248,10 @@ class UsbVideo(private val context: Context) {
         const val RECORDINGS_FOLDER = "SAR"
         private const val TAG = "SAR-Video"
         private const val WATCHDOG_MS = 6_000L
-        /** 4 Mbit/s ≈ 1,8 GB por hora en 1080p; de sobra para la calidad del video analógico. */
-        private const val BIT_RATE = 4_000_000
+        /**
+         * 2 Mbit/s ≈ 0,9 GB por hora. Alcanza: lo que llega por el VTX es una miniatura de 128×120
+         * del payload, ampliada por el receptor a 1080p; más bitrate no agrega detalle.
+         */
+        private const val BIT_RATE = 2_000_000
     }
 }

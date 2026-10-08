@@ -91,4 +91,17 @@ class PacketCodecTest {
         val a = Packet.Alert("A1", 65535, GeoPoint(-89.123456, -179.123456), 0.99, "235959")
         assert(PacketCodec.format(a).length + 2 <= 58)
     }
+
+    @Test
+    fun acceptsPacketsAsSentByPayloadWithoutGpsFix() {
+        // Formato exacto de sar_payload.py: sin fix, lat/lon (y la hora si el GPS no habla) van vacíos.
+        val a = PacketCodec.parse(pkt("SAR,A1,12,,,0.87,"))
+        assertIs<Packet.Alert>(a)
+        assertEquals(null, a.position)
+        assertEquals(0.87, a.confidence)
+        val h = PacketCodec.parse(pkt("SAH,A1,13,8.427310,-82.431200,7,153012,7.4"))
+        assertIs<Packet.Heartbeat>(h)
+        assertEquals(7.4, h.batteryVolts)
+        assertEquals(7, h.satellites)
+    }
 }

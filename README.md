@@ -168,7 +168,7 @@ entre el teléfono y la estación, o entre la estación y el dron.
 - **Video grande:** **⟳** lo gira de a 90° (girado aprovecha el alto del teléfono en vertical) y
   **⤢ Completa** oculta el encabezado y la lista.
 - **Grabar:** **● REC** graba el video tal como llega del receptor (MP4 H.264, 1080p, sin audio,
-  ≈ 1,8 GB por hora) en **Movies/SAR** del teléfono, con el nombre de la búsqueda. Mientras graba,
+  ≈ 0,9 GB por hora) en **Movies/SAR** del teléfono, con el nombre de la búsqueda. Mientras graba,
   el botón muestra **■ mm:ss** (tócalo para terminar) y la miniatura dice **● REC**. Sigue grabando
   si sales un momento de la app (por ejemplo, para compartir una detección); si se desconecta el
   receptor, el archivo se cierra con lo grabado hasta ahí. Sirve como evidencia y para revisar
