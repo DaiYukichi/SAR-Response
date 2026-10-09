@@ -87,7 +87,7 @@ get tired, but it is not infallible either. SAR-Response is built for that middl
 | **Searches** | Each search has a name, an **area drawn on the map** (tapping its corners) and a **planned flight altitude**: with it and the payload camera's FOV (fixed, 53.5°) the app computes the swath width and **how many pixels a person covers** in the model's image, and warns when the altitude is too high to detect well. The area's border is shown, there is a warning if the drone leaves it, and detections outside the area are flagged. Everything is **saved on the phone**: if Android kills the app, the search comes back as it was; previous searches can be opened, exported or deleted. The current search's area can be **drawn later or redrawn** (search bar → Draw / Redraw area) without losing what was received; if it has none, the bar shows **＋ area**. |
 | **Mission dashboard** | **Dashboard** tab with indicators computed only from real data: mission time, distance flown, confirmed / total, % of lost packets, **average operator decision time**, detection timeline, packet loss per mission segment and longest silence, team distances and the mission log. |
 | **Export** | **GPX** with confirmed and pending detections (not dismissed ones) and the drone track, for OsmAnd, Google Earth, QGIS, Garmin, etc. **CSV** with each detection, its status, when it arrived, when it was decided, how many seconds that took and how far it was from the operator, for the after-action report. |
-| **Online or offline map** | With internet, the world map with street detail loads online (indicator **Map: online**). Without internet, or if it drops, it switches by itself to the map stored on the phone (**Map: offline**). Online mode can be turned off in **⚙ Settings**. |
+| **Online or offline map** | With internet, the world map with street detail loads online (indicator **Map: online**). Without internet, or if it drops, it switches by itself to the map stored on the phone (**Map: offline**). Online mode can be turned off in **⚙** (Settings). |
 | **Offline map** | OpenStreetMap vector map with streets, places and names in Spanish or English. Bundled: **low-detail world + Chiriquí (Panama) with street detail** (~34 MB). **Download a map area** from the app (frame the area and that's it) or import a `.pmtiles` file. Nothing is downloaded in the field. |
 | **Ready on launch** | On first launch it asks for location, Bluetooth and camera (for the USB receiver) permissions on a welcome screen; then the map starts centered on the operator's position. |
 | **Demo mode** | Simulated mission to try out and present the app without a drone or radio. |
@@ -151,7 +151,7 @@ redraw the area, export GPX/CSV, finish, create a new one, or open/delete a prev
 ground station connects or a **detection** arrives with no search open, the app creates one
 automatically (keeping the detection) so nothing is lost.
 
-**⚙ Settings** holds the map options (online map, download an area, import, back to the
+**⚙** (Settings) holds the map options (online map, download an area, import, back to the
 bundled map) and the language.
 
 ### Main view and thumbnail

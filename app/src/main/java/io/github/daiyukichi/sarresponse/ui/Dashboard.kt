@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -646,15 +648,18 @@ private fun Tabs(showPanel: Boolean, onShowPanel: (Boolean) -> Unit) {
 /** Ajustes de la app (mapa e idioma), separados de la conexión con la estación tierra. */
 @Composable
 private fun SettingsButton(onClick: () -> Unit) {
+    // Solo el ícono: con texto no entraba en la fila en teléfonos con letra o pantalla más grande
+    // (en el POCO se cortaba en "Settin"). El nombre queda para TalkBack.
+    val label = stringResource(R.string.settings_title)
     Surface(
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
         color = Faint.copy(alpha = 0.15f),
         border = BorderStroke(1.dp, Faint.copy(alpha = 0.45f)),
-        modifier = Modifier.clip(RoundedCornerShape(50)).clickable(onClick = onClick),
+        modifier = Modifier.clip(CircleShape).clickable(onClickLabel = label, onClick = onClick),
     ) {
-        Text(
-            "⚙ " + stringResource(R.string.settings_title), color = Ink, fontWeight = FontWeight.Bold, fontSize = 12.sp,
-            maxLines = 1, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        Icon(
+            painterResource(R.drawable.ic_settings), contentDescription = label, tint = Muted,
+            modifier = Modifier.padding(6.dp).size(16.dp),
         )
     }
 }
